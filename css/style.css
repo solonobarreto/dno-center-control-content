@@ -603,7 +603,8 @@ body {
 .btn-switch-class {
   position: absolute;
   bottom: 2px;
-  right: 5px;
+  left: 60px;
+  transform: translateX(-50%);
   background: none;
   border: none;
   padding: 0;
@@ -616,7 +617,7 @@ body {
 }
 .btn-switch-class:hover {
   color: var(--accent-flame);
-  transform: scale(1.25);
+  transform: translateX(-50%) scale(1.25);
   opacity: 1;
 }
 
@@ -780,10 +781,13 @@ th {
   text-align: center;
 }
 
-/* Class Column Width — a little wider so the equipment bubble has room to breathe */
+/* Class Column Width — wide enough for icon + one-line equipment bubble, without leftover empty space */
 td.cell-class {
-  width: 175px;
+  width: 180px;
   position: relative;
+  vertical-align: top; /* predictable top anchor: the name sits pinned at top:4px and
+                           everything below (icon, gear bubble) flows at a fixed offset,
+                           instead of the whole block being vertically re-centered */
   cursor: var(--cursor-default);
   user-select: none;
 }
@@ -791,10 +795,10 @@ td.cell-class:active {
   cursor: var(--cursor-default);
 }
 
-/* Content column: tripled width vs. the original compact layout */
+/* Content column: reduced by the same 15px the class column gained over its original 175px */
 th.col-content,
 td.col-content {
-  width: 730px;
+  width: 725px;
 }
 
 /* Row height — espaço para 3 linhas de chips + a scrollbar horizontal (~11px),
@@ -806,14 +810,17 @@ td.col-content {
 }
 
 /* Class Cell Inner Layout
-   O ícone tem posição fixa (a coluna do ícone tem sempre a largura do próprio ícone, 34px).
-   O nick fica centralizado embaixo dele numa caixa um pouco mais larga (56px) que "sai" para
-   os dois lados sem empurrar nada; nicks maiores que a caixa ficam com "…" (nome completo
-   no tooltip). O gap de 12px reserva o espaço para o nick não encostar no balão de gear. */
+   O nome (classe + nick) fica ACIMA do ícone. .class-cell-content cresce
+   naturalmente até 140px para caber o texto (em vez do ícone ficar fixo em
+   34px e o nome "vazar" para os lados com margem negativa — isso cortava o
+   texto na coluna mais à esquerda da tabela). Textos maiores que a caixa
+   ficam com "…" (nome completo no tooltip). O gap de 12px reserva o espaço
+   para o nome não encostar no balão de gear. */
 .class-cell-container {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-top: 20px; /* fixed offset clearing the name label, now pinned top-left and out of flow */
 }
 
 .class-cell-content {
@@ -821,8 +828,9 @@ td.col-content {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  flex: 0 0 34px;
-  width: 34px;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 140px;
 }
 
 .class-cell-wrapper {
@@ -843,24 +851,60 @@ td.col-content {
   object-fit: contain;
 }
 
+/* Rótulo "Classe "Nick"" — nome da classe antes do nick, no estilo de uma
+   placa de nome temática: classe em Cinzel/dourado (mesma fonte dos títulos
+   do site), nick em itálico entre aspas, num tom pergaminho mais suave.
+   Fica dentro do próprio .class-cell-content (que agora cresce até 140px
+   para caber o texto), centralizado sobre o ícone por align-items — sem
+   margem negativa, que "vazava" a caixa para fora da tabela na coluna
+   mais à esquerda e cortava o começo do texto. */
 .class-nickname {
-  flex: 0 0 auto;
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  right: 22px; /* stops short of the '×' pinned to the top-right corner */
   box-sizing: border-box;
-  width: 56px;
-  max-width: 56px;
-  margin: 0 -11px;           /* (56 - 34) / 2: centraliza a caixa do nick sob o ícone */
-  font-size: 0.7rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 3px;
+  overflow: hidden;
+  text-align: left;
+  z-index: 2;
+}
+
+.class-nickname-class {
+  font-family: 'Cinzel', 'Segoe UI', serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
   color: var(--accent-gold);
-  font-weight: 600;
+  text-shadow: 0 0 6px rgba(232, 179, 77, 0.25);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: center;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
-/* nicks de 8+ caracteres usam uma fonte um pouco menor para caber inteiros */
-.class-nickname.nick-long {
-  font-size: 0.62rem;
+.class-nickname-name {
+  font-size: 0.66rem;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Rótulos longos (classe + nick) usam uma fonte um pouco menor para caber melhor */
+.class-nickname.nick-long .class-nickname-class {
+  font-size: 0.6rem;
+}
+.class-nickname.nick-long .class-nickname-name {
+  font-size: 0.58rem;
 }
 
 /* '+' Button (Top-Right of the small class icon) */
@@ -874,13 +918,32 @@ td.col-content {
   background: var(--accent-flame);
   color: var(--bg-void);
   border: 1px solid var(--bg-panel-alt);
-  font-weight: bold;
-  font-size: 11px;
-  line-height: 14px;
-  text-align: center;
+  font-size: 0; /* hides the "+" text node set by JS; the cross below is drawn in CSS */
   cursor: var(--cursor-pointer);
   box-shadow: 0 2px 4px rgba(0,0,0,0.6);
   transition: transform 0.2s, background 0.2s;
+}
+
+/* Pixel-exact "+" cross, immune to font-glyph metrics that made the text
+   version render visibly off-center inside the circle. */
+.btn-add-content-mini::before,
+.btn-add-content-mini::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: currentColor;
+  border-radius: 1px;
+}
+.btn-add-content-mini::before {
+  width: 8px;
+  height: 2px;
+  transform: translate(-50%, -50%);
+}
+.btn-add-content-mini::after {
+  width: 2px;
+  height: 8px;
+  transform: translate(-50%, -50%);
 }
 
 .btn-add-content-mini:hover {
@@ -921,30 +984,49 @@ td.col-content {
   transform: scale(1.15);
 }
 
-/* Remove-row '×' — plain glyph in the top-left corner of the Class cell, no circle/badge */
+/* Remove-row '×' — top-left corner of the Class cell, no circle/badge.
+   Same muted-until-hover treatment as the '×' inside content chips
+   (.chip-remove): faint by default, only turns red (var(--danger)) on
+   hover, instead of being permanently red like every other UI accent. */
 .btn-remove-row {
   position: absolute;
-  top: 2px;
-  left: 5px;
+  top: 6px; /* nudged down from 4px: an SVG box has no text leading, so at an
+               identical top value it renders visually higher than the name label
+               beside it, which sits inside a text line box with its own leading */
+  right: 5px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   padding: 0;
-  color: var(--danger);
-  font-weight: bold;
-  font-size: 14px;
-  line-height: 1;
+  color: var(--text-faint);
   cursor: var(--cursor-pointer);
   transition: color 0.2s, transform 0.2s;
 }
 
+.btn-remove-row svg {
+  display: block;
+  width: 11px;
+  height: 11px;
+}
+
 .btn-remove-row:hover {
-  color: #ff1a2a;
+  color: var(--accent-gold);
   transform: scale(1.2);
 }
 
-/* Equipment Info Bubble */
+/* Equipment Info Bubble — sits inline, beside the icon, inside .class-cell-container.
+   It used to overflow past the cell because the name label shared this same flex
+   row and ate up the width; now that the name is pinned to the cell's top-left
+   corner (out of this row entirely), the icon + bubble comfortably fit within
+   the 175px class column, so the bubble can stay always visible as intended. */
 .gear-bubble {
   position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 118px;
   background: var(--bg-inset);
   border: 1px solid var(--border-ember-soft);
   border-radius: 5px;
@@ -954,7 +1036,8 @@ td.col-content {
   flex-direction: column;
   gap: 1px;
   box-shadow: 0 3px 8px rgba(0,0,0,0.6);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .gear-bubble::before {
@@ -2904,16 +2987,16 @@ body.col-special .table-container {
   min-width: 0;
 }
 
-/* Coluna Especial: a largura da coluna Class é fixa (150px via th inline style e 175px via td);
+/* Coluna Especial: a largura da coluna Class é fixa (180px, tanto no th quanto no td);
    preservamos essa largura explicitamente para que table-layout:fixed não redistribua
    o espaço disponível comprimindo a coluna Class quando a tabela se expande para 100%. */
 body.col-special th:not(.col-content) {
-  width: 150px !important;
-  min-width: 150px !important;
+  width: 180px !important;
+  min-width: 180px !important;
 }
 body.col-special td.cell-class {
-  width: 175px !important;
-  min-width: 175px !important;
+  width: 180px !important;
+  min-width: 180px !important;
 }
 
 body.col-special th.col-content,

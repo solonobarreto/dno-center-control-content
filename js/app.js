@@ -94,6 +94,33 @@ function getClassName(cls) {
   return (entry && entry[lang]) || cls.name;
 }
 
+// Builds/refreshes a character row's name label so it reads
+// `Class "Nickname"` (e.g. Saleana "Loretta"), class name first. The raw
+// nickname is always kept in data-nickname — export/import, the "nick
+// already in use" check and the character filter all read from there
+// instead of the rendered text, so the class name shown alongside it never
+// leaks into any of that logic.
+function renderClassNickLabel(labelEl, cls, nickname) {
+  const className = getClassName(cls);
+  labelEl.dataset.nickname = nickname;
+  labelEl.dataset.classId = cls.id;
+  labelEl.innerHTML = "";
+
+  const classSpan = document.createElement("span");
+  classSpan.className = "class-nickname-class";
+  classSpan.textContent = className;
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "class-nickname-name";
+  nameSpan.textContent = `"${nickname}"`;
+
+  labelEl.appendChild(classSpan);
+  labelEl.appendChild(nameSpan);
+  labelEl.title = `${className} "${nickname}"`; // nome completo ao passar o mouse (caso seja truncado)
+  labelEl.classList.toggle("nick-long", `${className} ${nickname}`.length >= 14);
+}
+window.renderClassNickLabel = renderClassNickLabel;
+
 // Re-labels every already-rendered class icon (dropdown grid + character
 // rows) after the user switches languages. Exposed on window so the
 // language-selection code in index.html can call it.
@@ -110,6 +137,15 @@ function refreshClassLabels() {
   document.querySelectorAll("img[data-class-id]").forEach((img) => {
     const cls = ALL_CLASSES.find((c) => c.id === img.dataset.classId);
     if (cls) img.alt = getClassName(cls);
+  });
+
+  // Re-render each row's "Class "Nick"" label too, so the class-name portion
+  // (and the tooltip) follow the newly selected language.
+  document.querySelectorAll(".class-nickname[data-nickname]").forEach((labelEl) => {
+    const row = labelEl.closest("tr");
+    const classId = row ? row.dataset.classId : labelEl.dataset.classId;
+    const cls = ALL_CLASSES.find((c) => c.id === classId);
+    if (cls) renderClassNickLabel(labelEl, cls, labelEl.dataset.nickname);
   });
 }
 window.refreshClassLabels = refreshClassLabels;
@@ -439,7 +475,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("#tablesWrapper tbody tr").forEach((row) => {
       const classId = row.dataset.classId;
       const nicknameEl = row.querySelector(".class-nickname");
-      const nickname = nicknameEl ? nicknameEl.innerText : "";
+      const nickname = nicknameEl ? (nicknameEl.dataset.nickname || nicknameEl.innerText) : "";
 
       let gear = { set: null, weapon: null };
       try {
@@ -648,7 +684,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const normalized = nick.trim().toLowerCase();
     const existing = document.querySelectorAll(".class-nickname");
     for (const el of existing) {
-      if (el.innerText.trim().toLowerCase() === normalized) {
+      const existingNick = (el.dataset.nickname || el.innerText).trim().toLowerCase();
+      if (existingNick === normalized) {
         return true;
       }
     }
@@ -663,7 +700,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <table>
         <thead>
           <tr>
-            <th style="width: 150px;">Class</th>
+            <th style="width: 180px;">Class</th>
             <th class="col-content">Class Content</th>
           </tr>
         </thead>
@@ -942,21 +979,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const nickLabel = document.createElement("div");
     nickLabel.className = "class-nickname";
-    nickLabel.innerText = nickname;
-    nickLabel.title = nickname; // nome completo ao passar o mouse (caso seja truncado)
-    nickLabel.classList.toggle("nick-long", String(nickname).length >= 8);
+    renderClassNickLabel(nickLabel, cls, nickname);
 
-    cellContent.appendChild(wrapper);
+    // Nome (classe + nick) acima do ícone da classe.
     cellContent.appendChild(nickLabel);
+    cellContent.appendChild(wrapper);
 
     container.appendChild(cellContent);
     container.appendChild(gearBubble);
     classTd.appendChild(container);
 
-    // Remove-row '×' — top-right corner of the Class cell (replaces the old Actions column)
+    // Remove-row '×' — top-right corner of the Class cell (replaces the old Actions column).
+    // Same drawn SVG "X" as the content chips' remove button (.chip-remove), so both
+    // look identical instead of this one using a plain, permanently-red glyph.
     const removeBtn = document.createElement("button");
     removeBtn.className = "btn-remove-row";
-    removeBtn.innerText = "×";
+    removeBtn.innerHTML = '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" focusable="false" aria-hidden="true"><path d="M4 4L12 12M12 4L4 12"/></svg>';
     removeBtn.title = "Remove Character";
     removeBtn.onclick = (e) => {
       e.stopPropagation();
@@ -1982,6 +2020,13 @@ document.addEventListener("DOMContentLoaded", () => {
           wrapperImg.alt = btn.title;
           wrapperImg.dataset.classId = cls.id;
         }
+        // Update the "Class "Nick"" label so the class-name portion matches
+        // the newly picked class (nickname itself is unchanged).
+        const nickLabelEl = currentRow.querySelector(".class-nickname");
+        if (nickLabelEl) {
+          const nickname = nickLabelEl.dataset.nickname || nickLabelEl.textContent;
+          renderClassNickLabel(nickLabelEl, cls, nickname);
+        }
         popover.remove();
       });
       popover.appendChild(btn);
@@ -2302,7 +2347,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const nickOf = (row) => {
     const el = row.querySelector(".class-nickname");
-    return el ? el.innerText.trim() : "";
+    return el ? (el.dataset.nickname || el.innerText).trim() : "";
   };
   const allRows = () => Array.from(tablesWrapper.querySelectorAll("tbody tr"));
   const isActive = () => state.classes.size > 0 || state.characters.size > 0 || state.contents.size > 0 || !!state.content;
@@ -3294,7 +3339,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tablesWrapperEl.querySelectorAll("tbody tr").forEach((row) => {
       const classId = row.dataset.classId;
       const nicknameEl = row.querySelector(".class-nickname");
-      const nickname = nicknameEl ? nicknameEl.innerText : "";
+      const nickname = nicknameEl ? (nicknameEl.dataset.nickname || nicknameEl.innerText) : "";
       let gear = { set: null, weapon: null };
       try { gear = JSON.parse(row.dataset.gear || "{}"); } catch (_) {}
       const contents = [];
