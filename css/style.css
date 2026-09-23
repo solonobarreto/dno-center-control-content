@@ -1,0 +1,2933 @@
+/* =========================================================
+   Dragon Nest Origins — Content Control Center
+   Tema "Dragonfire" inspirado em dnorigins.com
+   ========================================================= */
+
+:root {
+  /* Base */
+  --bg-void: #0c0908;
+  --bg-panel: #17110d;
+  --bg-panel-alt: #1f1712;
+  --bg-inset: #0a0706;
+
+  /* Ember / bronze borders */
+  --border-ember: #4a3018;
+  --border-ember-soft: #2c1f14;
+
+  /* Accents */
+  --accent-flame: #ff7b1c;
+  --accent-flame-soft: rgba(255, 123, 28, 0.35);
+  --accent-ember: #d43f1f;
+  --accent-gold: #e8b34d;
+  --accent-gold-soft: rgba(232, 179, 77, 0.35);
+
+  /* Text */
+  --text-primary: #f3e6d3;
+  --text-muted: #b89a78;
+  --text-faint: #7d6a54;
+
+  /* Status */
+  --danger: #ff4d4d;
+  --success: #6be08a;
+
+  /* Rarity */
+  --rarity-epic: #ff9900;
+  --rarity-unique: #bf5af2;
+  --rarity-legend: #ff375f;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom Scrollbar Theme — "small clean": same straight-line look as the side
+   menu's border (1px solid var(--accent-flame)), just a touch thicker so it
+   stays easy to grab and drag. */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-flame);
+  border: none;
+  border-radius: 1px;   /* flat — a straight line, not a rounded pill */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  box-shadow: 0 0 6px 1px var(--accent-flame-soft);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-flame) transparent;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--bg-void);
+  background-image:
+    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(255, 123, 28, 0.10), transparent 60%),
+    radial-gradient(ellipse 700px 400px at 100% 0%, rgba(212, 63, 31, 0.10), transparent 55%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 26px);
+  color: var(--text-primary);
+  padding: 0.6rem 1rem;
+  min-height: 100vh;
+  font-size: 12px;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Floating ember particles (pure CSS, subtle "life" for the dragon theme) */
+.embers {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.embers span {
+  position: absolute;
+  bottom: -10px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--accent-flame);
+  box-shadow: 0 0 6px 1px var(--accent-flame-soft);
+  opacity: 0;
+  animation: emberRise linear infinite;
+}
+
+@keyframes emberRise {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.85;
+  }
+  90% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(-105vh) translateX(20px);
+    opacity: 0;
+  }
+}
+
+/* All primary content sits above the ember layer */
+.tables-wrapper {
+  position: relative;
+  z-index: 1;
+}
+
+/* Controls sits highest so its dropdown always paints in front of the tables below */
+.controls {
+  position: relative;
+  z-index: 20;
+  transition: opacity 0.12s ease;
+}
+
+/* The "+" (add class) button lives right above the tables, close enough to
+   the sticky header that once scrolled it starts sliding in behind it —
+   and its own hover glow can peek out past the header's edge before the
+   button is fully covered. Simplest fix: hide it outright as soon as the
+   page scrolls at all, and only show it again once back at the very top. */
+.controls.controls-scrolled {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Header — fica fixo no topo ao rolar a página (sticky), com fundo opaco para o
+   conteúdo não aparecer por baixo. O margin-top/padding-top negativo/positivo
+   compensa o padding do body, então o layout no topo continua idêntico.      */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  isolation: isolate;       /* own stacking context: nothing behind can ever paint above it */
+  will-change: transform;   /* forces its own compositing layer, avoiding the 1px seam that could
+                                 let content behind it (e.g. the + button) peek through while scrolling */
+  margin-top: -0.6rem;
+  padding-top: 0.6rem;
+  background: rgba(12, 9, 8, 1);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-bottom: 2px solid var(--border-ember);
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.8rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+/* Belt-and-suspenders fix for the 1px seam above: some browsers still let the
+   "+" (addClassBtn) row peek through the sticky header by a hairline while
+   scrolling through a table with 10 rows, because sub-pixel scroll offsets
+   can round the header's own edge short of its true boundary. This opaque
+   sliver, painted in the header's own stacking context, physically overlaps
+   that boundary so nothing behind it can ever show through. */
+.header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 3px;
+  background: rgba(12, 9, 8, 1);
+  pointer-events: none;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand h1 {
+  font-family: 'Cinzel', 'Segoe UI', serif;
+  font-size: 2.05rem;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  text-shadow: 0 0 10px var(--accent-flame-soft), 0 0 2px rgba(0,0,0,0.6);
+  white-space: nowrap;
+}
+
+.brand h2 {
+  font-family: 'Cinzel', 'Segoe UI', serif;
+  font-size: 1.05rem;
+  color: var(--accent-flame);
+  font-weight: 400;
+  letter-spacing: 1px;
+}
+
+.brand-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+/* Hamburger Menu Button — sits just under the end of "Dragon Nest Origins" */
+.btn-hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: var(--cursor-pointer);
+  margin-left: auto;
+}
+
+.btn-hamburger span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--accent-gold);
+  border-radius: 1px;
+  transition: background 0.2s;
+}
+
+.btn-hamburger:hover span {
+  background: var(--accent-flame);
+}
+
+.brand .author {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+/* Header Backup Actions (top-right) */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+.backup-label {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-right: 2px;
+}
+
+/* Weekly content-reset countdown, top-right of the header.
+   min-width/min-height are shared (literally, via the same values) with
+   .stat-counter below — "Acessos totais" and "Média diária" must render at
+   least as big as this box (min-, not fixed, so this box's own 3 text lines
+   are never clipped if a translation's note text runs long). Keep both in
+   sync if you change one. */
+.reset-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  line-height: 1.25;
+  min-width: 190px;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding: 3px 10px;
+  margin-right: 6px;
+  border: 1px solid var(--border-ember);
+  border-radius: 4px;
+  background: var(--bg-inset);
+  cursor: var(--cursor-default);
+}
+
+.reset-timer-label {
+  font-size: 0.62rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.reset-timer-value {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--accent-gold);
+  white-space: nowrap;
+}
+
+.reset-timer-note {
+  font-size: 0.58rem;
+  color: var(--text-faint);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.btn-backup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  padding: 5px 10px;
+  height: 26px;
+  width: 76px;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+/* Auto-save toggle button — same width/padding/height as the Export/Import
+   backup buttons (.btn-backup) so all three line up at exactly the same size. */
+.btn-autosave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 5px 10px;
+  height: 26px;
+  width: 76px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  border-color: var(--border-ember);
+  color: var(--text-muted);
+  background: var(--bg-panel-alt);
+  position: relative;
+}
+
+.btn-autosave:hover {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  background: var(--bg-panel-alt);
+  box-shadow: 0 0 8px var(--accent-gold-soft);
+}
+
+.btn-autosave[aria-pressed="true"] {
+  border-color: var(--success);
+  color: var(--success);
+  box-shadow: 0 0 8px rgba(107, 224, 138, 0.25);
+}
+
+.autosave-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.btn-autosave[aria-pressed="true"] .autosave-status-dot {
+  background: var(--success);
+  box-shadow: 0 0 5px var(--success);
+  animation: pulseDot 2s ease-in-out infinite;
+}
+
+.btn-autosave.autosave-flash {
+  box-shadow: 0 0 12px var(--success);
+  transition: box-shadow 0.15s;
+}
+
+/* Screenshot / print button */
+.btn-screenshot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--accent-gold);
+  background: var(--bg-panel-alt);
+  color: var(--accent-gold);
+  border-radius: 4px;
+  cursor: var(--cursor-pointer);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.btn-screenshot:hover {
+  background: var(--accent-gold);
+  color: var(--bg-void);
+  box-shadow: 0 0 10px var(--accent-gold-soft);
+}
+
+/* Screenshot flash overlay */
+.screenshot-flash {
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.18);
+  z-index: 99999;
+  pointer-events: none;
+  animation: flashFade 0.4s ease forwards;
+}
+@keyframes flashFade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Screenshot toast */
+.screenshot-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+  font-size: 12px;
+  font-weight: bold;
+  padding: 8px 18px;
+  border-radius: 20px;
+  z-index: 99999;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.7);
+  animation: toastFadeInOut 2.4s ease forwards;
+  white-space: nowrap;
+}
+@keyframes toastFadeInOut {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  15%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+}
+
+/* Online user counter */
+.online-counter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--border-ember);
+  border-radius: 4px;
+  background: var(--bg-inset);
+  cursor: var(--cursor-pointer);
+  margin-right: 2px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.online-counter:hover {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 8px var(--accent-gold-soft);
+}
+.online-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+  animation: pulseDot 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+.online-count-value {
+  font-size: 0.82rem;
+  font-weight: bold;
+  color: var(--success);
+}
+.online-count-label {
+  font-size: 0.62rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Total-access / daily-average header counters — same visual family as .online-counter.
+   Same min-width/min-height as .reset-timer above (kept literally in sync with it). */
+.stat-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+  min-width: 190px;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding: 3px 10px;
+  border: 1px solid var(--border-ember);
+  border-radius: 4px;
+  background: var(--bg-inset);
+  cursor: var(--cursor-default);
+  margin-right: 2px;
+}
+.stat-counter-value {
+  font-size: 0.82rem;
+  font-weight: bold;
+  color: var(--accent-gold);
+  white-space: nowrap;
+}
+.stat-counter-label {
+  font-size: 0.58rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Online-by-region slide-in panel */
+.region-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10800;
+  background: rgba(0,0,0,0.45);
+}
+.region-panel-overlay.hidden {
+  display: none;
+}
+.region-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(300px, 85vw);
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border-ember);
+  box-shadow: -6px 0 24px rgba(0,0,0,0.6);
+  display: flex;
+  flex-direction: column;
+  animation: regionPanelSlideIn 0.28s ease forwards;
+}
+@keyframes regionPanelSlideIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.region-panel-overlay.closing .region-panel {
+  animation: regionPanelSlideOut 0.22s ease forwards;
+}
+@keyframes regionPanelSlideOut {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+.region-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-ember-soft);
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  color: var(--accent-gold);
+}
+.region-panel-close {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  cursor: var(--cursor-pointer);
+}
+.region-panel-close:hover {
+  color: var(--accent-gold);
+}
+.region-panel-body {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+.region-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.region-row-count {
+  font-weight: bold;
+  color: var(--accent-gold);
+  min-width: 22px;
+  text-align: right;
+}
+
+/* Switch-class button — bottom-right of the Class cell */
+.btn-switch-class {
+  position: absolute;
+  bottom: 2px;
+  right: 5px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-gold);
+  font-size: 13px;
+  line-height: 1;
+  cursor: var(--cursor-pointer);
+  transition: color 0.2s, transform 0.2s;
+  opacity: 0.65;
+}
+.btn-switch-class:hover {
+  color: var(--accent-flame);
+  transform: scale(1.25);
+  opacity: 1;
+}
+
+/* Switch-class popover (reuses .dropdown-menu.class-grid; fixed position override) */
+.switch-class-popover {
+  position: fixed !important;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+/* Drag-reorder row highlight */
+tr.drag-over-top td {
+  border-top: 3px solid var(--accent-flame) !important;
+}
+tr.drag-over-bottom td {
+  border-bottom: 3px solid var(--accent-flame) !important;
+}
+
+/* Table currently under the dragged row (drop destination) */
+.table-container.drop-active {
+  border-color: var(--accent-flame);
+  box-shadow: 0 0 0 1px var(--accent-flame), 0 0 18px rgba(255, 123, 28, 0.25), 0 10px 24px rgba(0,0,0,0.45);
+}
+
+/* Keep the grabbing cursor everywhere while a row is being dragged */
+body.is-dragging-row,
+body.is-dragging-row * {
+  cursor: var(--cursor-default) !important;
+}
+
+/* Controls Bar */
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.dropdown-wrapper {
+  position: relative;
+}
+
+.btn {
+  border: 1px solid var(--accent-flame);
+  background: var(--bg-panel-alt);
+  color: var(--accent-gold);
+  border-radius: 4px;
+  cursor: var(--cursor-pointer);
+  font-weight: bold;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  background: var(--accent-flame);
+  color: var(--bg-void);
+  box-shadow: 0 0 10px var(--accent-flame-soft);
+}
+
+.btn-add {
+  font-size: 1.2rem;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Class Selection Dropdown Grid */
+.dropdown-menu {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--accent-flame);
+  border-radius: 6px;
+  padding: 8px;
+  z-index: 100;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.8);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  width: 200px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.class-icon-btn {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-radius: 4px;
+  padding: 4px;
+  cursor: var(--cursor-pointer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  min-height: 36px;
+}
+
+.class-icon-btn:hover {
+  border-color: var(--accent-gold);
+  transform: scale(1.05);
+  background: var(--bg-panel-alt);
+  box-shadow: 0 0 8px var(--accent-gold-soft);
+}
+
+.class-icon-btn img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+/* Tables Wrapper Side-by-Side Container */
+.tables-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: flex-start;
+}
+
+/* Compact Table Container */
+.table-container {
+  background: var(--bg-panel);
+  border-radius: 6px;
+  border: 1px solid var(--border-ember);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 10px 24px rgba(0,0,0,0.45);
+  overflow: visible;
+  width: 925px;
+  flex-shrink: 0;
+  position: relative;        /* ancora o botão de Coluna Especial / Normal */
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  table-layout: fixed;
+}
+
+th, td {
+  padding: 6px 6px;
+  border: 1px solid var(--border-ember-soft);
+  vertical-align: middle;
+  font-size: 12px;
+}
+
+th {
+  background: var(--bg-inset);
+  color: var(--accent-gold);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+/* Class Column Width — a little wider so the equipment bubble has room to breathe */
+td.cell-class {
+  width: 175px;
+  position: relative;
+  cursor: var(--cursor-default);
+  user-select: none;
+}
+td.cell-class:active {
+  cursor: var(--cursor-default);
+}
+
+/* Content column: tripled width vs. the original compact layout */
+th.col-content,
+td.col-content {
+  width: 730px;
+}
+
+/* Row height — espaço para 3 linhas de chips + a scrollbar horizontal (~11px),
+   assim a altura da linha é a mesma com ou sem scrollbar e nada é coberto.  */
+td.cell-class,
+td.col-content {
+  height: 69px;
+  min-height: 69px;
+}
+
+/* Class Cell Inner Layout
+   O ícone tem posição fixa (a coluna do ícone tem sempre a largura do próprio ícone, 34px).
+   O nick fica centralizado embaixo dele numa caixa um pouco mais larga (56px) que "sai" para
+   os dois lados sem empurrar nada; nicks maiores que a caixa ficam com "…" (nome completo
+   no tooltip). O gap de 12px reserva o espaço para o nick não encostar no balão de gear. */
+.class-cell-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.class-cell-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 34px;
+  width: 34px;
+}
+
+.class-cell-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 34px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-radius: 6px;
+  padding: 2px;
+  box-shadow: inset 0 0 6px rgba(255, 123, 28, 0.08);
+}
+
+.class-cell-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.class-nickname {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 56px;
+  max-width: 56px;
+  margin: 0 -11px;           /* (56 - 34) / 2: centraliza a caixa do nick sob o ícone */
+  font-size: 0.7rem;
+  color: var(--accent-gold);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* nicks de 8+ caracteres usam uma fonte um pouco menor para caber inteiros */
+.class-nickname.nick-long {
+  font-size: 0.62rem;
+}
+
+/* '+' Button (Top-Right of the small class icon) */
+.btn-add-content-mini {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-flame);
+  color: var(--bg-void);
+  border: 1px solid var(--bg-panel-alt);
+  font-weight: bold;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  cursor: var(--cursor-pointer);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.btn-add-content-mini:hover {
+  background: var(--success);
+  transform: scale(1.15);
+}
+
+/* Equipment Gear Button — circular, themed, holding a crisp SVG shield icon
+   (an emoji glyph rendered inconsistently across systems, so we draw our own) */
+.btn-gear-mini {
+  position: absolute;
+  bottom: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-inset);
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: var(--cursor-pointer);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.btn-gear-mini svg {
+  width: 10px;
+  height: 10px;
+  display: block;
+}
+
+.btn-gear-mini:hover {
+  background: var(--accent-gold);
+  color: var(--bg-void);
+  transform: scale(1.15);
+}
+
+/* Remove-row '×' — plain glyph in the top-left corner of the Class cell, no circle/badge */
+.btn-remove-row {
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--danger);
+  font-weight: bold;
+  font-size: 14px;
+  line-height: 1;
+  cursor: var(--cursor-pointer);
+  transition: color 0.2s, transform 0.2s;
+}
+
+.btn-remove-row:hover {
+  color: #ff1a2a;
+  transform: scale(1.2);
+}
+
+/* Equipment Info Bubble */
+.gear-bubble {
+  position: relative;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-radius: 5px;
+  padding: 3px 5px;
+  font-size: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.6);
+  white-space: nowrap;
+}
+
+.gear-bubble::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -5px;
+  transform: translateY(-50%);
+  border-width: 4px 5px 4px 0;
+  border-style: solid;
+  border-color: transparent var(--border-ember-soft) transparent transparent;
+}
+
+.gear-bubble-item {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.gear-bubble-label {
+  color: var(--text-faint);
+  font-weight: bold;
+}
+
+/* Rarity Color Classes */
+.rarity-epic {
+  color: var(--rarity-epic) !important;
+  font-weight: 600;
+}
+
+.rarity-unique {
+  color: var(--rarity-unique) !important;
+  font-weight: 600;
+}
+
+.rarity-legend {
+  color: var(--rarity-legend) !important;
+  font-weight: 600;
+}
+
+/* Content Mini Dropdown */
+.content-dropdown-mini {
+  position: fixed;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--accent-flame);
+  border-radius: 6px;
+  padding: 5px;
+  z-index: 9999;
+  width: 230px;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.9);
+}
+
+.content-item-mini {
+  padding: 4px 6px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-radius: 4px;
+  cursor: var(--cursor-pointer);
+  font-size: 11px;
+  margin-bottom: 3px;
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.content-item-mini:hover {
+  background: var(--accent-flame);
+  color: var(--bg-void);
+  font-weight: bold;
+}
+
+/* "Preset" and "Extra" sections at the bottom of a row's content dropdown */
+.content-dropdown-divider {
+  margin: 4px 2px 3px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-ember-soft);
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.content-item-preset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.content-item-preset .preset-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-delete {
+  flex-shrink: 0;
+  padding: 0 3px;
+  border-radius: 3px;
+  color: var(--text-faint);
+}
+
+.content-item-preset:hover .preset-delete {
+  color: var(--bg-void);
+}
+
+.preset-delete:hover,
+.content-item-preset:hover .preset-delete:hover {
+  background: var(--bg-void);
+  color: var(--danger);
+}
+
+.content-preset-empty {
+  padding: 2px 0 6px;
+  font-size: 10px;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+.content-item-extra {
+  text-align: center;
+  font-weight: bold;
+}
+
+.content-item-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.content-item-danger:hover {
+  background: var(--danger);
+  color: var(--bg-void);
+}
+
+/* Cascading Equipment Flyout Menus
+   Mounted inside #flyout-layer (a fixed full-screen layer) so they never
+   shift when the page scrolls, and never cause a page scrollbar.           */
+#flyout-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10000;
+  overflow: visible;
+}
+
+.gear-flyout-menu {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--accent-flame);
+  border-radius: 6px;
+  padding: 5px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 120px;
+  /* Only add internal scroll when content overflows the viewport */
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.gear-flyout-title {
+  font-size: 10px;
+  color: var(--accent-flame);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--border-ember-soft);
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.gear-flyout-item {
+  padding: 5px 8px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-radius: 4px;
+  cursor: var(--cursor-pointer);
+  font-size: 11px;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+}
+
+.gear-flyout-item:hover {
+  background: var(--accent-flame);
+  color: var(--bg-void);
+  font-weight: bold;
+}
+
+/* Flyout Right Arrows */
+.flyout-arrow {
+  color: var(--accent-gold);
+  font-size: 9px;
+}
+
+.gear-flyout-item:hover .flyout-arrow {
+  color: var(--bg-void);
+}
+
+.gear-enhance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  width: 130px;
+}
+
+.gear-enhance-btn {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  color: var(--accent-gold);
+  padding: 3px;
+  border-radius: 3px;
+  cursor: var(--cursor-pointer);
+  text-align: center;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.gear-enhance-btn:hover {
+  background: var(--accent-gold);
+  color: var(--bg-void);
+}
+
+/* Side Popover for Character Nickname */
+.nick-popover {
+  position: fixed;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--accent-flame);
+  border-radius: 6px;
+  padding: 8px;
+  z-index: 10001;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 160px;
+}
+
+.nick-popover-title {
+  font-size: 10px;
+  color: var(--accent-gold);
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.nick-popover input {
+  width: 100%;
+  padding: 4px 6px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-radius: 4px;
+  color: var(--accent-gold);
+  font-size: 11px;
+  outline: none;
+}
+
+.nick-popover input:focus {
+  border-color: var(--accent-gold);
+}
+
+.nick-popover input.input-error {
+  border-color: var(--danger);
+}
+
+.nick-popover-error {
+  font-size: 10px;
+  color: var(--danger);
+  line-height: 1.3;
+}
+
+.nick-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.nick-popover-btn {
+  padding: 3px 8px;
+  font-size: 10px;
+  border-radius: 3px;
+  cursor: var(--cursor-pointer);
+}
+
+/* Content Chips — laid out as columns (max 3 chips tall each). Chips keep a fixed,
+   readable size (same width for every column, priority or not) so the layout never
+   depends on how wide the surrounding table/column is — it looks the same in
+   "Coluna Normal" and "Coluna Especial". When the columns don't fit the cell, a
+   horizontal scrollbar appears. */
+.content-chips-container {
+  --chip-fs: 10px;
+  --chip-w: 192px;           /* fixed width for ANY chip (normal or priority) — wide enough that every content name, in every supported language (incl. longer ones like "Ежедневное задание" or "Reset sa loob ng"), fits without being clipped */
+  --chip-h: 16px;            /* height of one standard chip row */
+  --chip-gap: 2px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 4px;
+  height: auto;              /* 3 rows of chips; the scrollbar is added below them, never over them */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  padding-bottom: 5px;       /* reserves room for the horizontal scrollbar so it never overlaps/crops the last chip row */
+  box-sizing: content-box;
+}
+
+.content-chips-container::-webkit-scrollbar {
+  height: 2px;                /* thinner bar: less vertical space taken, less chance of cropping content */
+}
+
+.content-chips-container::-webkit-scrollbar-thumb {
+  border-radius: 1px;         /* keeps it a flat, straight line even at this reduced height */
+}
+
+.content-chip-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: var(--chip-gap);
+  flex: 0 0 auto;            /* tamanho padrão: não estica para preencher a célula (ex.: 1 só chip) */
+  width: var(--chip-w);      /* fixed width: identical in Coluna Normal and Coluna Especial */
+}
+
+.content-chip {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  width: var(--chip-w);
+  height: var(--chip-h);
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background: var(--bg-inset);
+  border: 1px solid var(--danger);
+  padding: 0.08em 0.5em;
+  border-radius: 4px;
+  font-size: var(--chip-fs);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.content-chip.done {
+  border-color: var(--success);
+  background: rgba(0, 255, 136, 0.08);
+  color: var(--success);
+}
+
+/* Top row of every chip: status + label (+ account number, for Duel Dragon) on the
+   left, remove "X" pinned on the right — the same arrangement for normal AND
+   priority (square) chips, so the "X" never moves. */
+.chip-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4em;
+  width: 100%;
+}
+
+.chip-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.chip-label {
+  min-width: 62px;           /* guarantees enough room for the name even when a sublabel (daily countdown) or account tag shares the same row, in any language */
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: var(--cursor-pointer);
+  color: var(--danger);
+  flex-shrink: 0;
+}
+
+.chip-status svg {
+  display: block;
+}
+
+.content-chip.done .chip-status {
+  color: var(--success);
+}
+
+.chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: var(--cursor-pointer);
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.chip-remove svg {
+  display: block;
+}
+
+.chip-remove:hover {
+  color: var(--danger);
+}
+
+/* Priority chips (Missão diária, Duel Dragon): same height/width/padding/shape as
+   every other content chip — occupying exactly 1 of the 3 reserved chip-rows in
+   their column, same as a normal chip — just sorted first. The status icon and
+   label keep the exact same layout (and therefore the exact same spacing
+   between them) as a normal chip, since no special positioning is applied here. */
+.content-chip.chip-priority {
+  border-radius: 4px;
+}
+
+/* Countdown (Daily) / Number ID (Duel Dragon) shown inline, right after the
+   label, on the SAME line — never a second row — so priority chips keep the
+   same single-row height as every other content chip. */
+.chip-sublabel {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  margin-left: 2px;
+  border-radius: 3px;
+  background: rgba(255, 199, 79, 0.12);
+  color: var(--text-faint);
+  font-size: 9px;
+  letter-spacing: 0.2px;
+  flex-shrink: 1;     /* yields space to the label first — the chip name must never be the thing that gets cropped */
+  min-width: 30px;    /* still enough to show just the countdown digits ("05:32") if squeezed */
+  max-width: 96px;    /* wide enough for longer translations, e.g. "Reset sa loob ng 05:32" */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content-chip.chip-priority.done .chip-sublabel {
+  color: var(--success);
+  opacity: 0.75;
+}
+
+/* Duel Dragon's confirmed Number ID, shown right after the label, highlighted */
+.chip-account-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  margin-left: 2px;
+  border-radius: 3px;
+  background: rgba(255, 199, 79, 0.16);
+  color: var(--accent-gold);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+  max-width: 46px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Small floating popover used to enter the Duel Dragon account number.
+   A yellow "LED" glow around it (border + soft outer shadow) makes this
+   little floating window easier to spot against the table behind it. */
+.account-id-popover {
+  position: fixed;
+  z-index: 10600;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  width: 190px;
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-gold);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.55), 0 0 16px 2px var(--accent-gold-soft);
+}
+
+.account-id-popover .account-id-title {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+
+.account-id-popover .account-id-input-row {
+  display: flex;
+  gap: 4px;
+}
+
+.account-id-popover .account-id-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-ember-soft);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.account-id-popover .account-id-input:focus {
+  outline: none;
+  border-color: var(--accent-gold);
+}
+
+.account-id-popover .account-id-confirm {
+  width: 26px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 1px solid var(--border-ember-soft);
+  background: var(--bg-inset);
+  color: var(--success);
+  font-size: 12px;
+  font-weight: bold;
+  cursor: var(--cursor-pointer);
+}
+
+.account-id-popover .account-id-confirm:hover {
+  border-color: var(--success);
+  background: rgba(0, 255, 136, 0.1);
+}
+
+.account-id-popover .account-id-error {
+  font-size: 9.5px;
+  color: var(--danger);
+  line-height: 1.3;
+}
+
+.account-id-popover .account-id-error.hidden {
+  display: none;
+}
+
+/* =========================================================
+   Manual Modal
+   ========================================================= */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20000;
+  padding: 20px;
+}
+
+.manual-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-flame);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(0,0,0,0.4);
+  transform: translateX(-120%);
+  opacity: 0;
+  animation: modalSlideInFromLeft 0.35s ease forwards;
+}
+
+.manual-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-ember);
+  flex-shrink: 0;
+}
+
+.manual-modal-header h3 {
+  font-family: 'Cinzel', 'Segoe UI', serif;
+  color: var(--accent-gold);
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+}
+
+/* Same look as the app's other "X" close buttons (.region-panel-close,
+   .btn-close-side): faint by default, gold on hover — no red. */
+.btn-close-manual {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: var(--cursor-pointer);
+  transition: transform 0.2s, color 0.2s;
+}
+
+.btn-close-manual:hover {
+  color: var(--accent-gold);
+  transform: scale(1.15);
+}
+
+.manual-modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+}
+
+.manual-section {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-ember-soft);
+}
+
+.manual-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.manual-section h4 {
+  color: var(--accent-flame);
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manual-section p {
+  color: var(--text-primary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* Manual icon badges — mirror the exact look of the real on-screen controls */
+.manual-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.manual-icon-add {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--accent-flame);
+  background: var(--bg-panel-alt);
+  color: var(--accent-gold);
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.manual-icon-remove-row {
+  color: var(--danger);
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.manual-icon-mini-add {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--accent-flame);
+  color: var(--bg-void);
+  font-weight: bold;
+  font-size: 11px;
+}
+
+.manual-icon-status {
+  color: var(--text-primary);
+  font-size: 11px;
+  letter-spacing: 3px;
+}
+
+.manual-icon-chip-remove {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.manual-icon-gear {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--bg-inset);
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.manual-icon-gear svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* =========================================================
+   Side Menu (hamburger)
+   ========================================================= */
+.side-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 19000;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  /* ao fechar: escurece some em 0.3s e só então fica invisível */
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+/* A regra global ".hidden { display: none !important }" impedia qualquer animação (o menu "pulava"
+   para a tela). Aqui o overlay continua no layout mesmo "oculto", só invisível e sem cliques. */
+.side-menu-overlay.hidden {
+  display: block !important;
+}
+
+.side-menu-overlay:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 0.4s ease, visibility 0s;
+}
+
+.side-menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 260px;
+  max-width: 82vw;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--accent-flame);
+  box-shadow: 8px 0 30px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease-in;               /* fechando: recolhe para a esquerda */
+}
+
+.side-menu-overlay:not(.hidden) .side-menu {
+  transform: translateX(0);
+  transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);   /* abrindo: desliza devagar, freando no fim */
+}
+
+.side-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-ember);
+  flex-shrink: 0;
+}
+
+.side-menu-title {
+  font-family: 'Cinzel', 'Segoe UI', serif;
+  color: var(--accent-gold);
+  font-size: 1rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Same look as the online-by-region panel's "X" (.region-panel-close): faint by
+   default, gold on hover — no red. */
+.btn-close-side {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 1;
+  cursor: var(--cursor-pointer);
+  transition: color 0.2s;
+}
+
+.btn-close-side:hover {
+  color: var(--accent-gold);
+}
+
+.side-menu-panels {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+.side-menu-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 4px;
+  overflow-y: auto;
+  transition: transform 0.25s ease;
+}
+
+.side-menu-panel-secondary {
+  transform: translateX(100%);
+}
+
+.side-menu-panels.show-language #sideMenuMain {
+  transform: translateX(-100%);
+}
+
+.side-menu-panels.show-language #sideMenuLanguage {
+  transform: translateX(0);
+}
+
+.side-menu-item {
+  text-align: left;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border-ember-soft);
+  color: var(--text-primary);
+  padding: 10px 12px;
+  border-radius: 5px;
+  cursor: var(--cursor-pointer);
+  font-size: 12.5px;
+  transition: all 0.2s;
+}
+
+.side-menu-item:hover {
+  border-color: var(--accent-gold);
+  background: var(--bg-inset);
+  color: var(--accent-gold);
+}
+
+/* Item de menu com legenda (ex.: Raid > Ice Dragon "Em processo de adaptação").
+   A legenda fica embaixo do nome, dentro da mesma altura dos outros botões:
+   o padding total (7 + 13 = 20px) é igual ao dos demais itens (10 + 10), e a
+   legenda é posicionada em absoluto na área de baixo, sem aumentar o botão.   */
+.side-menu-item-wip {
+  position: relative;
+  display: block;
+  padding-top: 7px;
+  padding-bottom: 13px;
+}
+
+.side-menu-legend {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 4px;
+  font-size: 9px;
+  line-height: 1;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-faint);
+}
+
+.side-menu-item-wip:hover .side-menu-legend {
+  color: var(--text-muted);
+}
+
+.raid-wip-note {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.side-menu-item.lang-active {
+  border-color: var(--accent-flame);
+  color: var(--accent-flame);
+  font-weight: 600;
+}
+
+.side-menu-back {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: var(--cursor-pointer);
+  padding: 4px 2px 10px;
+}
+
+.side-menu-back:hover {
+  color: var(--accent-gold);
+}
+
+/* =========================================================
+   Guide Modal
+   ========================================================= */
+.guide-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-flame);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.9);
+  transform: translateX(-120%);
+  opacity: 0;
+  animation: modalSlideInFromLeft 0.35s ease forwards;
+}
+
+@keyframes modalSlideInFromLeft {
+  from { transform: translateX(-120%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+.guide-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-ember);
+  flex-shrink: 0;
+}
+
+.guide-modal-header h3 {
+  font-family: 'Cinzel', serif;
+  color: var(--accent-gold);
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+}
+
+/* Guide close button — matches the menu close button (.btn-close-side) look:
+   a plain glyph, faint by default, gold on hover, no border/box around it. */
+.btn-close-guide {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 1;
+  cursor: var(--cursor-pointer);
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.btn-close-guide:hover {
+  color: var(--accent-gold);
+}
+
+.guide-modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Guide Table Styles */
+.guide-table-wrapper {
+  overflow-x: auto;
+}
+
+.guide-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.guide-table th,
+.guide-table td {
+  padding: 7px 10px;
+  border: 1px solid var(--border-ember);
+  text-align: center;
+}
+
+.guide-table th {
+  background: var(--bg-inset);
+  color: var(--accent-gold);
+  font-size: 0.62rem;
+  line-height: 1.3;
+  padding: 6px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.guide-table td {
+  background: var(--bg-panel-alt);
+  color: var(--text-primary);
+}
+
+.guide-table tr:nth-child(even) td {
+  background: var(--bg-panel);
+}
+
+.guide-table tr.total-row td {
+  background: var(--bg-inset);
+  color: var(--accent-flame);
+  font-weight: bold;
+}
+
+/* Column color accents matching original image */
+.guide-table td.col-hge  { color: #c084fc; }
+.guide-table td.col-hgp  { color: #a78bfa; }
+.guide-table td.col-eol  { color: #fb923c; }
+.guide-table td.col-pd   { color: #facc15; }
+.guide-table td.col-pa   { color: #4ade80; }
+.guide-table td.col-gold { color: var(--accent-gold); font-weight: 600; }
+.guide-table td.col-rate { color: #67e8f9; }
+.guide-table td.col-spring { color: #86efac; }
+
+/* Spirit Guide Table */
+.guide-spirit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.guide-spirit-card {
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border-ember);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.guide-spirit-card h4 {
+  font-family: 'Cinzel', serif;
+  color: var(--accent-flame);
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-ember-soft);
+  padding-bottom: 6px;
+}
+
+.spirit-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-ember-soft);
+  font-size: 11.5px;
+}
+
+.spirit-info-row:last-child { border-bottom: none; }
+
+.spirit-info-label { color: var(--text-muted); }
+.spirit-info-value { color: var(--text-primary); font-weight: 600; }
+
+/* Daily Rotation Table */
+/* Day headers keep the standard themed th styling (var(--bg-inset) / gold text) —
+   no per-weekday background colors, per theme consistency. */
+
+/* Raid Guide */
+.raid-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-ember-soft);
+}
+
+.raid-section:last-child { border-bottom: none; }
+
+.raid-section h4 {
+  font-family: 'Cinzel', serif;
+  color: var(--accent-flame);
+  font-size: 1rem;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: var(--bg-inset);
+  border-left: 3px solid var(--accent-flame);
+  border-radius: 0 4px 4px 0;
+}
+
+.raid-section h5 {
+  color: var(--accent-gold);
+  font-size: 0.85rem;
+  margin: 10px 0 6px;
+  letter-spacing: 0.3px;
+}
+
+.raid-section p,
+.raid-section li {
+  color: var(--text-primary);
+  font-size: 11.5px;
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+
+.raid-section ul {
+  padding-left: 18px;
+  margin-bottom: 8px;
+}
+
+.skill-tag {
+  display: inline-block;
+  background: var(--bg-inset);
+  border: 1px solid var(--accent-ember);
+  color: var(--accent-ember);
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 3px;
+  white-space: nowrap;
+}
+
+.tip-box {
+  background: rgba(255,123,28,0.08);
+  border: 1px solid var(--accent-flame-soft);
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.tip-box strong { color: var(--accent-gold); }
+
+.raid-video-link {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 6px 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--accent-ember);
+  color: var(--accent-flame);
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.raid-video-link:hover {
+  background: var(--accent-flame);
+  color: var(--bg-void);
+  border-color: var(--accent-flame);
+}
+
+.raid-video-link.is-open {
+  background: var(--accent-flame);
+  color: var(--bg-void);
+  border-color: var(--accent-flame);
+}
+
+/* Vídeo embutido — abre logo abaixo do botão, como um bloco que estava oculto */
+.raid-video-embed {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  transition: grid-template-rows 0.3s ease, margin-top 0.3s ease;
+}
+
+.raid-video-embed.open {
+  grid-template-rows: 1fr;
+  margin-top: 8px;
+}
+
+.raid-video-embed-inner {
+  min-height: 0;
+  overflow: hidden;
+  text-align: center;
+}
+
+.raid-video-frame {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;            /* centraliza o vídeo no guia */
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 1px solid var(--accent-ember);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.raid-video-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.raid-video-yt {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.raid-video-yt:hover {
+  color: var(--accent-flame);
+}
+
+/* Progression Guide */
+.progression-wrapper {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.progression-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.progression-heading {
+  font-family: 'Cinzel', serif;
+  color: var(--accent-gold);
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 6px 8px;
+  background: var(--bg-inset);
+  border: 1px solid var(--accent-gold);
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.progression-card {
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border-ember);
+  border-left: 3px solid var(--accent-ember);
+  border-radius: 0 5px 5px 0;
+  padding: 8px 10px;
+}
+
+.progression-card.highlight {
+  border-left-color: var(--success);
+}
+
+.progression-card h5 {
+  color: var(--accent-flame);
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+}
+
+.progression-card p {
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.progression-card.clickable {
+  cursor: var(--cursor-pointer);
+  transition: all 0.2s;
+}
+
+.progression-card.clickable:hover {
+  border-color: var(--accent-gold);
+  background: var(--bg-inset);
+  box-shadow: 0 0 8px var(--accent-gold-soft);
+}
+
+.progression-click-hint {
+  color: var(--accent-gold);
+  font-size: 10px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.leveling-guide-btn {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  padding: 8px 14px;
+  margin: 4px 0 14px;
+  font-size: 12px;
+}
+
+/* Leveling Guide overlay — slides in from the left, over the Progression guide */
+.leveling-modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-flame);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.9);
+  transform: translateX(-120%);
+  opacity: 0;
+  animation: levelingSlideIn 0.35s ease forwards;
+}
+
+@keyframes levelingSlideIn {
+  from { transform: translateX(-120%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+.leveling-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.leveling-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 10px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border-ember-soft);
+  border-left: 3px solid var(--accent-gold);
+  border-radius: 0 5px 5px 0;
+}
+
+.leveling-range {
+  flex-shrink: 0;
+  min-width: 58px;
+  font-family: 'Cinzel', serif;
+  color: var(--accent-gold);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.leveling-desc {
+  color: var(--text-primary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.leveling-caption {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Boss thumbnail above each day's content in the rotation table.
+   <img> pulls the real portrait from img/<boss>.jpg|png; if that file is
+   missing the inline onerror handler swaps it for a small themed badge
+   (initials on a gradient plate) as a fallback so the layout never breaks. */
+.rotation-boss-thumb {
+  display: block;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 5px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.5);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 2px 5px rgba(0,0,0,0.6);
+  object-fit: cover;
+}
+
+span.rotation-boss-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cinzel', serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #0c0908;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+}
+
+.thumb-cerberus  { background: linear-gradient(160deg, #fdba74, #c2410c); }
+.thumb-apocalypse{ background: linear-gradient(160deg, #d8b4fe, #7e22ce); }
+.thumb-manticore { background: linear-gradient(160deg, #86efac, #15803d); }
+.thumb-archbishop{ background: linear-gradient(160deg, #fde68a, #b45309); }
+.thumb-gigant    { background: linear-gradient(160deg, #fca5a5, #b91c1c); }
+
+/* Guide sub-nav tabs */
+.guide-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.guide-tab-btn {
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border-ember);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: var(--cursor-pointer);
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.guide-tab-btn:hover {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.guide-tab-btn.active {
+  border-color: var(--accent-flame);
+  background: var(--bg-inset);
+  color: var(--accent-flame);
+  font-weight: bold;
+}
+
+.guide-tab-panel { display: none; }
+.guide-tab-panel.active { display: block; }
+
+/* Side-menu sub-items for Guide */
+.side-menu-subitem {
+  text-align: left;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-left: 3px solid var(--accent-ember);
+  color: var(--text-muted);
+  padding: 8px 12px 8px 14px;
+  border-radius: 0 5px 5px 0;
+  cursor: var(--cursor-pointer);
+  font-size: 11.5px;
+  transition: all 0.2s;
+}
+
+.side-menu-subitem:hover {
+  border-color: var(--accent-gold);
+  background: var(--bg-panel-alt);
+  color: var(--accent-gold);
+}
+
+/* Raid sub-panel */
+.side-menu-panels.show-guide #sideMenuMain { transform: translateX(-100%); }
+.side-menu-panels.show-guide #sideMenuGuide { transform: translateX(0); }
+.side-menu-panels.show-raid #sideMenuMain { transform: translateX(-100%); }
+.side-menu-panels.show-raid #sideMenuGuide { transform: translateX(-100%); }
+.side-menu-panels.show-raid #sideMenuRaid { transform: translateX(0); }
+.side-menu-panels.show-language #sideMenuMain { transform: translateX(-100%); }
+.side-menu-panels.show-language #sideMenuLanguage { transform: translateX(0); }
+
+#sideMenuGuide { transform: translateX(100%); }
+#sideMenuRaid  { transform: translateX(100%); }
+
+
+/* =========================================================
+   Cursor personalizado (arquivo extra/cursor.cur, na raiz do projeto).
+   O caminho é relativo a este CSS (css/style.css → ../extra/cursor.cur).
+   Campos de texto continuam com o cursor de texto (I) e arrastar linhas com a mão de arrastar.
+   ========================================================= */
+/* Cursor normal (seta) e cursor de clique (mãozinha). Os dois usam o mesmo arquivo; para ter
+   uma imagem diferente na mãozinha, salve outro .cur em extra/ e troque só a linha --cursor-pointer. */
+:root {
+  --cursor-default: url("../extra/cursor.cur"), auto;
+  --cursor-pointer: url("../extra/cursor.cur"), pointer;
+}
+
+html,
+body {
+  cursor: var(--cursor-default);
+}
+
+/* O navegador dá cursor próprio a botões, links e afins; aqui eles também usam o cursor personalizado */
+a,
+button,
+select,
+summary,
+label,
+[role="button"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"] {
+  cursor: var(--cursor-pointer);
+}
+
+button:disabled,
+input:disabled {
+  cursor: var(--cursor-default);
+}
+
+/* =========================================================
+   Menu lateral aberto pelo canto esquerdo da tela
+   ========================================================= */
+.menu-hover-zone {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 100%;
+  z-index: 18000;
+}
+
+/* linha discreta que indica onde encostar o mouse */
+.menu-hover-zone::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, var(--accent-flame), transparent);
+  opacity: 0.3;
+  transition: opacity 0.2s;
+}
+
+.menu-hover-zone:hover::after {
+  opacity: 0.9;
+}
+
+/* Em telas com mouse o menu abre pelo canto; o botão de hambúrguer fica só para telas de toque */
+@media (hover: hover) and (pointer: fine) {
+  .btn-hamburger {
+    display: none;
+  }
+}
+
+@media not all and (hover: hover) {
+  .menu-hover-zone {
+    display: none;
+  }
+}
+
+/* =========================================================
+   Filtro (canto superior direito)
+   ========================================================= */
+.filter-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.btn-filter {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--accent-gold);
+  background: var(--bg-panel-alt);
+  color: var(--accent-gold);
+  border-radius: 4px;
+  cursor: var(--cursor-pointer);
+  transition: all 0.2s;
+}
+
+.btn-filter:hover,
+.btn-filter.is-active {
+  background: var(--accent-gold);
+  color: var(--bg-void);
+  box-shadow: 0 0 10px var(--accent-gold-soft);
+}
+
+.filter-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--accent-flame);
+  color: var(--bg-void);
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 15px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.filter-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 250px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-flame);
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
+  padding: 4px;
+  z-index: 60;
+}
+
+.filter-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--accent-gold);
+  font-family: 'Cinzel', 'Segoe UI', serif;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: var(--cursor-pointer);
+}
+
+.filter-section-head:hover {
+  background: rgba(255, 123, 28, 0.12);
+}
+
+.filter-chevron {
+  transition: transform 0.2s;
+  color: var(--text-muted);
+}
+
+.filter-section-head.open .filter-chevron {
+  transform: rotate(180deg);
+}
+
+.filter-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: left;
+  cursor: var(--cursor-pointer);
+}
+
+.filter-option:hover {
+  background: rgba(255, 123, 28, 0.12);
+  color: var(--accent-gold);
+}
+
+.filter-option.on {
+  border-color: var(--accent-flame);
+  color: var(--accent-gold);
+}
+
+.filter-check,
+.filter-radio {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--accent-flame);
+  background: var(--bg-inset);
+  color: var(--accent-flame);
+  font-size: 11px;
+  line-height: 12px;
+  text-align: center;
+}
+
+.filter-check {
+  border-radius: 3px;
+}
+
+.filter-radio {
+  border-radius: 50%;
+  position: relative;
+}
+
+.filter-radio.on::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--accent-flame);
+}
+
+.filter-option-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  object-fit: contain;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-radius: 4px;
+}
+
+.filter-option-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-status {
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.filter-status.done {
+  color: var(--success);
+}
+
+.filter-status.pending {
+  color: var(--danger);
+}
+
+.filter-empty {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.filter-clear {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid var(--border-ember);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: var(--cursor-pointer);
+}
+
+.filter-clear:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Efeito do filtro na tabela */
+tr.filter-hidden-row,
+.table-container.filter-hidden-table,
+.content-chip.filter-hidden {
+  display: none;
+}
+
+/* Filtro de conteúdo ativo: os chips restantes são reorganizados em colunas de 3,
+   sem mexer nos dados (as colunas originais ficam "dissolvidas" só visualmente). */
+.content-chips-container.is-filtered {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, auto);
+  grid-auto-columns: max-content;   /* mantém o tamanho padrão do chip, mesmo com 1 só */
+  gap: 2px 4px;
+  align-content: start;
+}
+
+.content-chips-container.is-filtered .content-chip-col {
+  display: contents;
+}
+
+
+/* =========================================================
+   Scrollbars personalizadas
+   O navegador SEMPRE usa a seta do sistema sobre uma scrollbar nativa (o CSS "cursor" não vale
+   para ela). Por isso, com mouse, as scrollbars nativas são escondidas (a rolagem continua
+   funcionando: roda do mouse, teclado, arrastar) e desenhadas por cima em #csLayer, onde o
+   cursor personalizado funciona. O JS liga tudo isso adicionando a classe "cs-on" no <html>.
+   ========================================================= */
+html.cs-on,
+html.cs-on .cs-managed {
+  scrollbar-width: none !important;
+}
+
+html.cs-on::-webkit-scrollbar,
+html.cs-on .cs-managed::-webkit-scrollbar {
+  display: none;
+}
+
+/* A scrollbar nativa reservava espaço embaixo dos chips; a personalizada fica por cima,
+   então o espaço passa a ser reservado por padding (sempre, para todas as linhas ficarem iguais). */
+html.cs-on .content-chips-container.cs-managed {
+  padding-bottom: 10px;
+}
+
+/* =========================================================
+   Cursor virtual em JS: esconde o cursor real do SO em todo o
+   documento quando o cursor customizado JS está ativo.
+   O cursor JS (#jsCursor) flutua no #csLayer e nunca some,
+   mesmo durante diálogos nativos de arquivo (Save/Open).
+   Campos de texto e contenteditable mantêm cursor: text.
+   ========================================================= */
+html.js-cursor-on,
+html.js-cursor-on * {
+  cursor: none !important;
+}
+
+html.js-cursor-on input[type="text"],
+html.js-cursor-on input[type="search"],
+html.js-cursor-on input[type="email"],
+html.js-cursor-on input[type="password"],
+html.js-cursor-on input[type="number"],
+html.js-cursor-on textarea,
+html.js-cursor-on [contenteditable="true"],
+html.js-cursor-on .class-nickname[contenteditable] {
+  cursor: text !important;
+}
+
+#jsCursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  user-select: none;
+  transform: translate(-2px, -2px); /* hot-spot do cursor.cur (canto superior esquerdo) */
+  z-index: 2147483647;
+  display: none;
+  image-rendering: pixelated;
+}
+
+#csLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* "Small clean": a área de clique fica confortável para arrastar (ver BAR no JS),
+   mas o que aparece é só uma linha reta e fina — no mesmo estilo da borda do
+   menu lateral (1px solid var(--accent-flame)) — centralizada dentro dessa área. */
+.cs-track {
+  position: absolute;
+  display: none;
+  pointer-events: auto;
+  background: transparent;
+  cursor: var(--cursor-default);
+}
+
+.cs-thumb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: transparent;
+  border: none;
+  box-sizing: border-box;
+  cursor: var(--cursor-default);
+}
+
+.cs-thumb::after {
+  content: "";
+  position: absolute;
+  background: var(--accent-flame);
+  border-radius: 1px;
+}
+
+.cs-thumb-v::after { top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); }
+.cs-thumb-h::after { left: 0; right: 0; top: 50%; height: 2px; transform: translateY(-50%); }
+
+.cs-thumb:hover::after,
+.cs-thumb.dragging::after {
+  width: 3px;
+  box-shadow: 0 0 6px 1px var(--accent-flame-soft);
+}
+
+.cs-thumb-h:hover::after,
+.cs-thumb-h.dragging::after {
+  width: auto;
+  height: 3px;
+}
+
+
+/* =========================================================
+   Coluna Especial / Coluna Normal
+   ========================================================= */
+.col-mode-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border-ember);
+  background: var(--bg-panel-alt);
+  color: var(--accent-gold);
+  border-radius: 4px;
+  cursor: var(--cursor-pointer);
+  transition: all 0.2s;
+}
+
+.col-mode-btn:hover {
+  background: var(--accent-gold);
+  color: var(--bg-void);
+  box-shadow: 0 0 8px var(--accent-gold-soft);
+}
+
+.col-mode-popover {
+  position: fixed;
+  width: 270px;
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-flame);
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
+  padding: 4px;
+  z-index: 70;
+}
+
+.col-mode-title {
+  padding: 6px 10px;
+  color: var(--accent-gold);
+  font-family: 'Cinzel', 'Segoe UI', serif;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.col-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: left;
+  cursor: var(--cursor-pointer);
+}
+
+.col-mode-option:hover {
+  background: rgba(255, 123, 28, 0.12);
+  color: var(--accent-gold);
+}
+
+.col-mode-option.on {
+  border-color: var(--accent-flame);
+  color: var(--accent-gold);
+}
+
+.col-mode-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.col-mode-option-text small {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+/* Coluna Especial: tabela única, coluna de conteúdo até o fim da tela */
+body.col-special .tables-wrapper {
+  flex-wrap: nowrap;
+}
+
+body.col-special .table-container {
+  width: 100%;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* Coluna Especial: a largura da coluna Class é fixa (150px via th inline style e 175px via td);
+   preservamos essa largura explicitamente para que table-layout:fixed não redistribua
+   o espaço disponível comprimindo a coluna Class quando a tabela se expande para 100%. */
+body.col-special th:not(.col-content) {
+  width: 150px !important;
+  min-width: 150px !important;
+}
+body.col-special td.cell-class {
+  width: 175px !important;
+  min-width: 175px !important;
+}
+
+body.col-special th.col-content,
+body.col-special td.col-content {
+  width: auto;           /* pega todo o espaço que sobra ao lado da coluna Class */
+}
+
+/* Filtro por conteúdo específico */
+.filter-subhead {
+  margin: 6px 10px 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-ember-soft);
+  color: var(--text-faint);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
