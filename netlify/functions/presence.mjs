@@ -7,6 +7,13 @@ const KNOWN_REGIONS = new Set([
   "southAmerica", "northAmerica", "europe", "asia", "africa", "oceania", "unknown"
 ]);
 
+// Códigos de país (ISO-3166 alpha-2) aceitos como está; qualquer coisa fora
+// do formato cai em "XX" (agrupado como "outros" dentro da região).
+function sanitizeCountry(country) {
+  if (typeof country === "string" && /^[A-Z]{2}$/.test(country)) return country;
+  return "XX";
+}
+
 // Dia em UTC ("YYYY-MM-DD") — usado para deduplicar 1 acesso por dispositivo
 // por dia, igual ao fallback local do front, só que de verdade compartilhado
 // entre todos os visitantes.
@@ -32,10 +39,11 @@ export default async (req) => {
       await presenceStore.delete(id);
     } else {
       const region = KNOWN_REGIONS.has(body.region) ? body.region : "unknown";
-      await presenceStore.set(id, JSON.stringify({ ts: now, region }));
+      const country = sanitizeCountry(body.country);
+      await presenceStore.set(id, JSON.stringify({ ts: now, region, country }));
 
-      // Acessos totais + média diária: conta no máximo 1 acesso por
-      // dispositivo por dia (dedupe via chave própria), então soma de
+      // Acessos totais + média diária + região/país: conta no máximo 1 acesso
+      // por dispositivo por dia (dedupe via chave própria), então soma de
       // verdade entre TODOS os visitantes — não só o navegador de quem olha.
       const visitKey = `visit:${id}:${today}`;
       const alreadyVisitedToday = await statsStore.get(visitKey);
@@ -44,11 +52,18 @@ export default async (req) => {
 
         let totals = null;
         try { totals = JSON.parse((await statsStore.get("totals")) || "null"); } catch (_) { totals = null; }
-        if (!totals || typeof totals !== "object") totals = { total: 0, days: {} };
+        if (!totals || typeof totals !== "object") totals = { total: 0, days: {}, regions: {} };
         totals.days = totals.days || {};
+        totals.regions = totals.regions || {};
 
         totals.total = (totals.total || 0) + 1;
         totals.days[today] = (totals.days[today] || 0) + 1;
+
+        const regionEntry = totals.regions[region] || { total: 0, countries: {} };
+        regionEntry.total = (regionEntry.total || 0) + 1;
+        regionEntry.countries = regionEntry.countries || {};
+        regionEntry.countries[country] = (regionEntry.countries[country] || 0) + 1;
+        totals.regions[region] = regionEntry;
 
         await statsStore.set("totals", JSON.stringify(totals));
       }
@@ -56,10 +71,12 @@ export default async (req) => {
   }
 
   // Varre as sessões de presença: descarta as que não mandam heartbeat há
-  // mais de STALE_MS e agrega quantas estão online, por região, com as que
-  // sobraram (isso é o que o painel "Pessoas online por região" mostra).
+  // mais de STALE_MS e agrega quantas estão online, por região e por país
+  // dentro de cada região (isso é o que o painel "Pessoas online por região"
+  // mostra, incluindo o detalhamento por país ao expandir uma região).
   const { blobs } = await presenceStore.list();
   const regionCounts = {};
+  const countryCounts = {}; // { region: { countryCode: count } }
   let aliveCount = 0;
 
   await Promise.all(
@@ -68,10 +85,11 @@ export default async (req) => {
       try { raw = JSON.parse((await presenceStore.get(key)) || "null"); } catch (_) { raw = null; }
 
       // Compatível com o formato antigo (valor era só o timestamp em texto,
-      // sem região) — entradas assim caem em "unknown" até expirarem.
+      // sem região/país) — entradas assim caem em "unknown"/"XX" até expirarem.
       const isObj = raw && typeof raw === "object";
       const ts = isObj ? Number(raw.ts) : Number(raw);
       const region = isObj && KNOWN_REGIONS.has(raw.region) ? raw.region : "unknown";
+      const country = isObj ? sanitizeCountry(raw.country) : "XX";
 
       if (!ts || now - ts > STALE_MS) {
         await presenceStore.delete(key);
@@ -79,23 +97,37 @@ export default async (req) => {
       }
       aliveCount++;
       regionCounts[region] = (regionCounts[region] || 0) + 1;
+      countryCounts[region] = countryCounts[region] || {};
+      countryCounts[region][country] = (countryCounts[region][country] || 0) + 1;
     })
   );
 
   const count = Math.max(1, aliveCount);
 
-  // Estatísticas globais: acessos totais (todos os visitantes, desde sempre)
-  // e a média diária a partir de quantos dias distintos já tiveram acesso.
+  // Estatísticas globais: acessos totais (todos os visitantes, desde sempre),
+  // a média diária a partir de quantos dias distintos já tiveram acesso, e o
+  // detalhamento por região/país usado pelo painel "Total de visitantes".
   let totals = null;
   try { totals = JSON.parse((await statsStore.get("totals")) || "null"); } catch (_) { totals = null; }
   const total = (totals && totals.total) || count; // nunca menos que quem está online agora
   const dayCount = totals && totals.days ? Math.max(1, Object.keys(totals.days).length) : 1;
   const dailyAverage = total / dayCount;
 
+  const totalRegionCounts = {};
+  const totalCountryCounts = {};
+  if (totals && totals.regions && typeof totals.regions === "object") {
+    for (const [region, entry] of Object.entries(totals.regions)) {
+      if (!entry || typeof entry !== "object") continue;
+      totalRegionCounts[region] = entry.total || 0;
+      totalCountryCounts[region] = entry.countries || {};
+    }
+  }
+
   return new Response(JSON.stringify({
     count,
     regions: regionCounts,
-    stats: { total, dailyAverage }
+    countries: countryCounts,
+    stats: { total, dailyAverage, regions: totalRegionCounts, countries: totalCountryCounts }
   }), {
     headers: { "content-type": "application/json", "cache-control": "no-store" }
   });

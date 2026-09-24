@@ -176,7 +176,23 @@ const EXTRA_MENU_LABELS = {
   fil:     { extra: "Extra", addAll: "Idagdag Lahat", removeAll: "Alisin Lahat",
              preset: "Preset", savePreset: "I-save sa Preset", noPresets: "Walang naka-save na preset",
              presetSaved: "Na-save ang preset", emptyPreset: "Magdagdag muna ng content bago mag-save ng preset",
-             deletePreset: "Burahin ang preset" }
+             deletePreset: "Burahin ang preset" },
+  id:      { extra: "Ekstra", addAll: "Tambah Semua", removeAll: "Hapus Semua",
+             preset: "Preset", savePreset: "Simpan ke Preset", noPresets: "Belum ada preset tersimpan",
+             presetSaved: "Preset tersimpan", emptyPreset: "Tambahkan konten sebelum menyimpan preset",
+             deletePreset: "Hapus preset" },
+  zh:      { extra: "额外", addAll: "全部添加", removeAll: "全部移除",
+             preset: "预设", savePreset: "保存为预设", noPresets: "尚无已保存的预设",
+             presetSaved: "预设已保存", emptyPreset: "请先添加内容再保存预设",
+             deletePreset: "删除预设" },
+  fr:      { extra: "Extra", addAll: "Tout ajouter", removeAll: "Tout retirer",
+             preset: "Préréglage", savePreset: "Enregistrer comme préréglage", noPresets: "Aucun préréglage enregistré",
+             presetSaved: "Préréglage enregistré", emptyPreset: "Ajoutez du contenu avant d'enregistrer un préréglage",
+             deletePreset: "Supprimer le préréglage" },
+  de:      { extra: "Extra", addAll: "Alle hinzufügen", removeAll: "Alle entfernen",
+             preset: "Preset", savePreset: "Als Preset speichern", noPresets: "Keine gespeicherten Presets",
+             presetSaved: "Preset gespeichert", emptyPreset: "Fügen Sie zuerst Inhalte hinzu, bevor Sie ein Preset speichern",
+             deletePreset: "Preset löschen" }
 };
 
 function getExtraLabels() {
@@ -271,6 +287,7 @@ const ALL_CONTENTS = [
   "Red Dragon Normal",
   "Red Dragon Hardcore",
   "Desert Dragon Hardcore",
+  "Ice Dragon Normal",
   "Duel Dragon",
   "Daidalos Easy",
   "Daidalos Normal",
@@ -299,7 +316,11 @@ const CONTENT_LABELS = {
     es: "Misión diaria",
     en: "Daily Quest",
     ru: "Ежедневное задание",
-    fil: "Daily Quest"
+    fil: "Daily Quest",
+    id: "Misi Harian",
+    zh: "每日任务",
+    fr: "Quête quotidienne",
+    de: "Tägliche Quest"
   }
 };
 
@@ -1903,6 +1924,75 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   const VISITOR_REGION = detectRegion();
 
+  // ---- Country detection (client-side, same idea as detectRegion) ----
+  // Maps the browser's IANA timezone to an ISO-3166 country code. Not
+  // perfect (a timezone can span more than one country), but good enough to
+  // give a "by country" breakdown inside each region's panel without asking
+  // for geolocation permission or calling an external IP-lookup service.
+  const TZ_COUNTRY_MAP = {
+    // South America
+    "America/Sao_Paulo": "BR", "America/Bahia": "BR", "America/Fortaleza": "BR", "America/Recife": "BR",
+    "America/Manaus": "BR", "America/Belem": "BR", "America/Boa_Vista": "BR", "America/Campo_Grande": "BR",
+    "America/Cuiaba": "BR", "America/Eirunepe": "BR", "America/Maceio": "BR", "America/Noronha": "BR",
+    "America/Porto_Velho": "BR", "America/Rio_Branco": "BR", "America/Santarem": "BR",
+    "America/Argentina/Buenos_Aires": "AR", "America/Argentina/Catamarca": "AR", "America/Argentina/Cordoba": "AR",
+    "America/Argentina/Jujuy": "AR", "America/Argentina/La_Rioja": "AR", "America/Argentina/Mendoza": "AR",
+    "America/Argentina/Rio_Gallegos": "AR", "America/Argentina/Salta": "AR", "America/Argentina/San_Juan": "AR",
+    "America/Argentina/San_Luis": "AR", "America/Argentina/Tucuman": "AR", "America/Argentina/Ushuaia": "AR",
+    "America/Buenos_Aires": "AR", "America/Cordoba": "AR", "America/Mendoza": "AR",
+    "America/Santiago": "CL", "America/Punta_Arenas": "CL",
+    "America/Bogota": "CO", "America/Caracas": "VE", "America/Guayaquil": "EC", "America/Lima": "PE",
+    "America/La_Paz": "BO", "America/Asuncion": "PY", "America/Montevideo": "UY",
+    "America/Guyana": "GY", "America/Paramaribo": "SR", "America/Cayenne": "GF",
+    // North & Central America
+    "America/New_York": "US", "America/Chicago": "US", "America/Denver": "US", "America/Los_Angeles": "US",
+    "America/Anchorage": "US", "America/Phoenix": "US", "America/Detroit": "US", "America/Boise": "US",
+    "America/Indiana/Indianapolis": "US", "America/Kentucky/Louisville": "US", "America/Adak": "US",
+    "America/Honolulu": "US", "America/Juneau": "US",
+    "America/Toronto": "CA", "America/Vancouver": "CA", "America/Edmonton": "CA", "America/Winnipeg": "CA",
+    "America/Halifax": "CA", "America/St_Johns": "CA", "America/Montreal": "CA", "America/Regina": "CA",
+    "America/Mexico_City": "MX", "America/Tijuana": "MX", "America/Cancun": "MX", "America/Monterrey": "MX",
+    "America/Merida": "MX", "America/Hermosillo": "MX", "America/Chihuahua": "MX",
+    "America/Guatemala": "GT", "America/Costa_Rica": "CR", "America/Panama": "PA", "America/Tegucigalpa": "HN",
+    "America/Managua": "NI", "America/El_Salvador": "SV", "America/Belize": "BZ",
+    "America/Santo_Domingo": "DO", "America/Havana": "CU", "America/Jamaica": "JM", "America/Puerto_Rico": "PR",
+    // Europe
+    "Europe/Lisbon": "PT", "Atlantic/Azores": "PT", "Atlantic/Madeira": "PT",
+    "Europe/Madrid": "ES", "Atlantic/Canary": "ES",
+    "Europe/Paris": "FR", "Europe/Berlin": "DE", "Europe/London": "GB", "Europe/Rome": "IT",
+    "Europe/Moscow": "RU", "Europe/Kaliningrad": "RU", "Europe/Samara": "RU",
+    "Europe/Amsterdam": "NL", "Europe/Brussels": "BE", "Europe/Vienna": "AT", "Europe/Warsaw": "PL",
+    "Europe/Athens": "GR", "Europe/Bucharest": "RO", "Europe/Budapest": "HU", "Europe/Prague": "CZ",
+    "Europe/Stockholm": "SE", "Europe/Oslo": "NO", "Europe/Copenhagen": "DK", "Europe/Helsinki": "FI",
+    "Europe/Dublin": "IE", "Europe/Zurich": "CH", "Europe/Kyiv": "UA", "Europe/Kiev": "UA",
+    "Europe/Istanbul": "TR", "Europe/Sofia": "BG", "Europe/Belgrade": "RS",
+    // Asia
+    "Asia/Manila": "PH", "Asia/Jakarta": "ID", "Asia/Makassar": "ID", "Asia/Jayapura": "ID",
+    "Asia/Shanghai": "CN", "Asia/Urumqi": "CN", "Asia/Tokyo": "JP", "Asia/Seoul": "KR",
+    "Asia/Bangkok": "TH", "Asia/Kolkata": "IN", "Asia/Calcutta": "IN", "Asia/Singapore": "SG",
+    "Asia/Kuala_Lumpur": "MY", "Asia/Ho_Chi_Minh": "VN", "Asia/Dubai": "AE", "Asia/Riyadh": "SA",
+    "Asia/Karachi": "PK", "Asia/Dhaka": "BD", "Asia/Taipei": "TW", "Asia/Hong_Kong": "HK",
+    "Asia/Yangon": "MM", "Asia/Phnom_Penh": "KH", "Asia/Vientiane": "LA", "Asia/Tel_Aviv": "IL",
+    "Asia/Jerusalem": "IL",
+    // Africa
+    "Africa/Lagos": "NG", "Africa/Cairo": "EG", "Africa/Johannesburg": "ZA", "Africa/Nairobi": "KE",
+    "Africa/Casablanca": "MA", "Africa/Accra": "GH", "Africa/Algiers": "DZ", "Africa/Tunis": "TN",
+    "Africa/Luanda": "AO", "Africa/Maputo": "MZ",
+    // Oceania
+    "Pacific/Auckland": "NZ", "Pacific/Fiji": "FJ", "Pacific/Guam": "GU", "Pacific/Port_Moresby": "PG"
+  };
+  function detectCountry() {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      if (TZ_COUNTRY_MAP[tz]) return TZ_COUNTRY_MAP[tz];
+      if (tz.startsWith("Australia/")) return "AU";
+      return "XX"; // unmapped — grouped as "other" within its region
+    } catch (_) {
+      return "XX";
+    }
+  }
+  const VISITOR_COUNTRY = detectCountry();
+
   // ---- Fallback (same browser only) ----
   const ONLINE_KEY = "dnOrigins_onlineHeartbeat";
   const STALE_THRESHOLD = 25000;
@@ -1929,8 +2019,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // fallback can only report the current device's own region.
     return { [VISITOR_REGION]: 1 };
   }
+  function localCountries(region) {
+    // Same limitation as localRegions: only knows about this device.
+    if (region !== VISITOR_REGION) return {};
+    return { [VISITOR_COUNTRY]: 1 };
+  }
 
   let lastRegions = null;
+  let lastCountries = null; // { region: { countryCode: count } }
   function showOnline(n) {
     const el = document.getElementById("onlineCountValue");
     if (el) el.textContent = n;
@@ -1942,7 +2038,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(PRESENCE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: SESSION_ID, region: VISITOR_REGION }),
+        body: JSON.stringify({ id: SESSION_ID, region: VISITOR_REGION, country: VISITOR_COUNTRY }),
         cache: "no-store"
       });
       if (!res.ok) throw new Error(`presence ${res.status}`);
@@ -1950,13 +2046,18 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof data.count !== "number") throw new Error("bad response");
       showOnline(data.count);
       lastRegions = (data.regions && typeof data.regions === "object") ? data.regions : null;
+      lastCountries = (data.countries && typeof data.countries === "object") ? data.countries : null;
     } catch (_) {
       showOnline(localCount());
       lastRegions = null;
+      lastCountries = null;
     }
+    if (typeof window.refreshRegionPanel === "function") window.refreshRegionPanel();
   }
   window.getOnlineRegions = () => lastRegions || localRegions();
+  window.getOnlineCountries = (region) => (lastCountries && lastCountries[region]) || localCountries(region);
   window.VISITOR_REGION = VISITOR_REGION;
+  window.VISITOR_COUNTRY = VISITOR_COUNTRY;
 
   // Tell the server this session is gone (so the count drops right away) —
   // but only once every tab belonging to this device has closed.
@@ -2329,7 +2430,11 @@ const FILTER_LABELS = {
   es:      { title: "Filtro", cls: "Clase", character: "Personaje", content: "Contenido", specific: "Por contenido", done: "Contenido completado", pending: "Contenido pendiente", clear: "Limpiar filtros", none: "Ningún personaje añadido" },
   en:      { title: "Filter", cls: "Class", character: "Character", content: "Content", specific: "By content", done: "Completed content", pending: "Pending content", clear: "Clear filters", none: "No characters added" },
   ru:      { title: "Фильтр", cls: "Класс", character: "Персонаж", content: "Контент", specific: "По контенту", done: "Пройденный контент", pending: "Непройденный контент", clear: "Сбросить фильтры", none: "Персонажи не добавлены" },
-  fil:     { title: "Filter", cls: "Class", character: "Character", content: "Content", specific: "Ayon sa content", done: "Tapos na content", pending: "Nakabinbing content", clear: "I-clear ang mga filter", none: "Walang naka-add na character" }
+  fil:     { title: "Filter", cls: "Class", character: "Character", content: "Content", specific: "Ayon sa content", done: "Tapos na content", pending: "Nakabinbing content", clear: "I-clear ang mga filter", none: "Walang naka-add na character" },
+  id:      { title: "Filter", cls: "Kelas", character: "Karakter", content: "Konten", specific: "Berdasarkan konten", done: "Konten selesai", pending: "Konten tertunda", clear: "Hapus filter", none: "Belum ada karakter yang ditambahkan" },
+  zh:      { title: "筛选", cls: "职业", character: "角色", content: "内容", specific: "按内容", done: "已完成内容", pending: "待完成内容", clear: "清除筛选", none: "尚未添加角色" },
+  fr:      { title: "Filtre", cls: "Classe", character: "Personnage", content: "Contenu", specific: "Par contenu", done: "Contenu terminé", pending: "Contenu en attente", clear: "Effacer les filtres", none: "Aucun personnage ajouté" },
+  de:      { title: "Filter", cls: "Klasse", character: "Charakter", content: "Inhalt", specific: "Nach Inhalt", done: "Abgeschlossener Inhalt", pending: "Ausstehender Inhalt", clear: "Filter zurücksetzen", none: "Kein Charakter hinzugefügt" }
 };
 
 function getFilterLabels() {
@@ -2926,7 +3031,11 @@ const COLUMN_MODE_LABELS = {
   es:      { title: "Diseño de columna", special: "Columna Especial", specialDesc: "Tabla única; el contenido ocupa todo el ancho", normal: "Columna Normal", normalDesc: "Modelo estándar (tablas lado a lado)" },
   en:      { title: "Column layout", special: "Special Column", specialDesc: "Single table; content fills the full width", normal: "Normal Column", normalDesc: "Default model (tables side by side)" },
   ru:      { title: "Вид колонки", special: "Особая колонка", specialDesc: "Одна таблица; контент на всю ширину", normal: "Обычная колонка", normalDesc: "Стандартный вид (таблицы рядом)" },
-  fil:     { title: "Layout ng column", special: "Special Column", specialDesc: "Iisang table; sakop ng content ang buong lapad", normal: "Normal Column", normalDesc: "Karaniwang modelo (magkakatabing table)" }
+  fil:     { title: "Layout ng column", special: "Special Column", specialDesc: "Iisang table; sakop ng content ang buong lapad", normal: "Normal Column", normalDesc: "Karaniwang modelo (magkakatabing table)" },
+  id:      { title: "Tata letak kolom", special: "Kolom Khusus", specialDesc: "Satu tabel; konten memenuhi seluruh lebar", normal: "Kolom Normal", normalDesc: "Model standar (tabel berdampingan)" },
+  zh:      { title: "列布局", special: "特殊列", specialDesc: "单表格；内容占满整个宽度", normal: "常规列", normalDesc: "默认模式（表格并排显示）" },
+  fr:      { title: "Disposition des colonnes", special: "Colonne spéciale", specialDesc: "Un seul tableau ; le contenu occupe toute la largeur", normal: "Colonne normale", normalDesc: "Modèle par défaut (tableaux côte à côte)" },
+  de:      { title: "Spaltenlayout", special: "Spezialspalte", specialDesc: "Eine Tabelle; der Inhalt füllt die gesamte Breite aus", normal: "Normale Spalte", normalDesc: "Standardmodell (Tabellen nebeneinander)" }
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -3048,19 +3157,24 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // =========================================================
-// Online-by-region slide-in panel
-// Opens when the online-counter badge is clicked; shows a breakdown of
-// visitors per continent, translated. Uses window.getOnlineRegions()
-// (from the presence/heartbeat block above), which returns real
-// server-aggregated data when /api/presence supports the "regions" field,
-// or falls back to just this device's own region.
+// Region breakdown slide-in panel — shared by two triggers:
+//   - the online-counter badge ("Pessoas online por região")
+//   - the total-visitors counter ("Total de visitantes por região")
+// Each region row can be clicked to expand and show a breakdown by
+// country within that region. Data source depends on which trigger opened
+// the panel: window.getOnlineRegions/getOnlineCountries (from the
+// presence/heartbeat block above) for the online mode, and
+// window.getTotalRegions/getTotalCountries (from the total-access block
+// below) for the total-visitors mode.
 // =========================================================
 document.addEventListener("DOMContentLoaded", () => {
   const onlineCounter = document.getElementById("onlineCounter");
+  const totalCounter = document.getElementById("totalAccessCounter");
   const overlay = document.getElementById("regionPanelOverlay");
   const closeBtn = document.getElementById("closeRegionPanelBtn");
   const body = document.getElementById("regionPanelBody");
-  if (!onlineCounter || !overlay || !body) return;
+  const titleEl = document.getElementById("regionPanelTitle");
+  if (!overlay || !body) return;
 
   const REGION_ORDER = ["southAmerica", "northAmerica", "europe", "asia", "africa", "oceania", "unknown"];
   const REGION_KEY_I18N = {
@@ -3073,8 +3187,34 @@ document.addEventListener("DOMContentLoaded", () => {
     unknown: "regionUnknown"
   };
 
+  let currentMode = "online"; // "online" | "total"
+  let expandedRegion = null;
+
+  function countryName(code) {
+    if (!code || code === "XX") return i18n("regionUnknown", "Unknown");
+    try {
+      const dn = new Intl.DisplayNames([getCurrentLang()], { type: "region" });
+      return dn.of(code) || code;
+    } catch (_) {
+      return code;
+    }
+  }
+
+  function getRegions() {
+    if (currentMode === "total") {
+      return (typeof window.getTotalRegions === "function") ? window.getTotalRegions() : {};
+    }
+    return (typeof window.getOnlineRegions === "function") ? window.getOnlineRegions() : {};
+  }
+  function getCountries(region) {
+    if (currentMode === "total") {
+      return (typeof window.getTotalCountries === "function") ? window.getTotalCountries(region) : {};
+    }
+    return (typeof window.getOnlineCountries === "function") ? window.getOnlineCountries(region) : {};
+  }
+
   function renderRegions() {
-    const regions = (typeof window.getOnlineRegions === "function") ? window.getOnlineRegions() : {};
+    const regions = getRegions() || {};
     body.innerHTML = "";
     const entries = REGION_ORDER
       .map((key) => [key, regions[key] || 0])
@@ -3091,20 +3231,70 @@ document.addEventListener("DOMContentLoaded", () => {
     entries
       .sort((a, b) => b[1] - a[1])
       .forEach(([key, count]) => {
-        const row = document.createElement("div");
-        row.className = "region-row";
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "region-row region-row-toggle";
+        row.setAttribute("aria-expanded", String(expandedRegion === key));
+
+        const left = document.createElement("span");
+        left.className = "region-row-left";
+        const arrow = document.createElement("span");
+        arrow.className = "region-row-arrow";
+        arrow.textContent = "▸";
         const label = document.createElement("span");
         label.textContent = i18n(REGION_KEY_I18N[key], key);
+        left.appendChild(arrow);
+        left.appendChild(label);
+
         const countEl = document.createElement("span");
         countEl.className = "region-row-count";
         countEl.textContent = String(count).padStart(2, "0");
-        row.appendChild(label);
+
+        row.appendChild(left);
         row.appendChild(countEl);
+        row.addEventListener("click", (e) => {
+          e.stopPropagation();
+          expandedRegion = (expandedRegion === key) ? null : key;
+          renderRegions();
+        });
         body.appendChild(row);
+
+        if (expandedRegion === key) {
+          const countries = getCountries(key) || {};
+          const countryEntries = Object.entries(countries)
+            .filter(([, c]) => c > 0)
+            .sort((a, b) => b[1] - a[1]);
+
+          const wrap = document.createElement("div");
+          wrap.className = "region-country-list";
+          if (countryEntries.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "region-country-row";
+            empty.textContent = "—";
+            wrap.appendChild(empty);
+          } else {
+            countryEntries.forEach(([code, c]) => {
+              const crow = document.createElement("div");
+              crow.className = "region-country-row";
+              const cLabel = document.createElement("span");
+              cLabel.textContent = countryName(code);
+              const cCount = document.createElement("span");
+              cCount.className = "region-row-count";
+              cCount.textContent = String(c).padStart(2, "0");
+              crow.appendChild(cLabel);
+              crow.appendChild(cCount);
+              wrap.appendChild(crow);
+            });
+          }
+          body.appendChild(wrap);
+        }
       });
   }
 
-  function openPanel() {
+  function openPanel(mode) {
+    currentMode = mode;
+    expandedRegion = null;
+    if (titleEl) titleEl.textContent = i18n(mode === "total" ? "totalByRegionTitle" : "onlineByRegionTitle");
     renderRegions();
     overlay.classList.remove("hidden");
     overlay.classList.remove("closing");
@@ -3114,10 +3304,27 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => overlay.classList.add("hidden"), 200);
   }
 
-  onlineCounter.addEventListener("click", (e) => {
-    e.stopPropagation();
-    openPanel();
-  });
+  // Re-renders the panel in place (new heartbeat/stats data, or language
+  // switch) without closing it, but only while it's actually open.
+  window.refreshRegionPanel = () => {
+    if (overlay.classList.contains("hidden")) return;
+    if (titleEl) titleEl.textContent = i18n(currentMode === "total" ? "totalByRegionTitle" : "onlineByRegionTitle");
+    renderRegions();
+  };
+
+  if (onlineCounter) {
+    onlineCounter.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPanel("online");
+    });
+  }
+  if (totalCounter) {
+    totalCounter.classList.add("stat-counter-clickable");
+    totalCounter.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPanel("total");
+    });
+  }
   if (closeBtn) closeBtn.addEventListener("click", closePanel);
   overlay.addEventListener("click", (e) => { if (e.target === overlay) closePanel(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !overlay.classList.contains("hidden")) closePanel(); });
@@ -3184,6 +3391,26 @@ document.addEventListener("DOMContentLoaded", () => {
     avgEl.textContent = Math.ceil((stats.total || 1) / dayCount);
   }
 
+  // Region/country breakdown for the "Total de visitantes" panel — mirrors
+  // window.getOnlineRegions/getOnlineCountries but backed by the server's
+  // all-time totals (data.stats.regions / data.stats.countries) instead of
+  // who's online right now. Falls back to just this device's own
+  // region/country (same weaker local approximation used elsewhere).
+  let lastTotalRegions = null;
+  let lastTotalCountries = null; // { region: { countryCode: count } }
+  function localTotalRegions() {
+    const region = (typeof window.VISITOR_REGION === "string") ? window.VISITOR_REGION : "unknown";
+    return { [region]: 1 };
+  }
+  function localTotalCountries(region) {
+    const visitorRegion = (typeof window.VISITOR_REGION === "string") ? window.VISITOR_REGION : "unknown";
+    if (region !== visitorRegion) return {};
+    const country = (typeof window.VISITOR_COUNTRY === "string") ? window.VISITOR_COUNTRY : "XX";
+    return { [country]: 1 };
+  }
+  window.getTotalRegions = () => lastTotalRegions || localTotalRegions();
+  window.getTotalCountries = (region) => (lastTotalCountries && lastTotalCountries[region]) || localTotalCountries(region);
+
   async function loadServerStats() {
     try {
       const res = await fetch("/api/presence", { method: "GET", cache: "no-store" });
@@ -3192,6 +3419,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data && data.stats && typeof data.stats.total === "number" && typeof data.stats.dailyAverage === "number") {
         totalEl.textContent = data.stats.total;
         avgEl.textContent = Math.ceil(data.stats.dailyAverage);
+        lastTotalRegions = (data.stats.regions && typeof data.stats.regions === "object") ? data.stats.regions : null;
+        lastTotalCountries = (data.stats.countries && typeof data.stats.countries === "object") ? data.stats.countries : null;
+        if (typeof window.refreshRegionPanel === "function") window.refreshRegionPanel();
         return true;
       }
     } catch (_) {}
@@ -3231,6 +3461,14 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!btn || !tablesWrapperEl) return;
 
   let autoSaveEnabled = localStorage.getItem(AUTOSAVE_KEY) === "true";
+  if (autoSaveEnabled && !supportsFsAccess) {
+    // Estado herdado de uma sessão anterior neste navegador (ou de outro
+    // navegador, se o localStorage foi importado) — sem a File System Access
+    // API não há como continuar salvando num único arquivo, então desligamos
+    // em vez de retomar o download repetido/quebrado.
+    autoSaveEnabled = false;
+    localStorage.setItem(AUTOSAVE_KEY, "false");
+  }
   let saveTimer = null;
   let lastSavedHash = null;
   let fileHandle = null; // FileSystemFileHandle cached in memory once obtained/loaded
@@ -3427,6 +3665,21 @@ document.addEventListener("DOMContentLoaded", () => {
   btn.addEventListener("click", async (e) => {
     e.stopPropagation();
     const turningOn = !autoSaveEnabled;
+
+    // Sem a File System Access API (ex.: Firefox) não há como sobrescrever um
+    // único arquivo silenciosamente — cada "auto-save" acabaria disparando um
+    // novo download (o navegador numera como "(1)", "(2)"...) e, se a opção
+    // "perguntar onde salvar cada arquivo" estiver ativa, um diálogo a cada
+    // vez. Em vez de repetir esse comportamento quebrado, avisamos e não
+    // ativamos — o botão "Exportar" continua disponível para salvar na hora.
+    if (turningOn && !supportsFsAccess) {
+      if (window.showToast) {
+        window.showToast(
+          "Auto-save em arquivo único não é suportado neste navegador. Use Chrome/Edge, ou clique em Exportar para salvar manualmente."
+        );
+      }
+      return;
+    }
 
     if (turningOn && supportsFsAccess) {
       let handle = await getStoredHandle();
