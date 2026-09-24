@@ -2038,7 +2038,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(PRESENCE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: SESSION_ID, region: VISITOR_REGION, country: VISITOR_COUNTRY }),
+        // region/country não são mais enviados aqui: o backend agora calcula
+        // isso sozinho a partir do IP real da requisição (context.geo da
+        // Netlify), então o que o navegador mandasse seria ignorado mesmo.
+        body: JSON.stringify({ id: SESSION_ID }),
         cache: "no-store"
       });
       if (!res.ok) throw new Error(`presence ${res.status}`);
