@@ -3188,7 +3188,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   let currentMode = "online"; // "online" | "total"
-  let expandedRegion = null;
+  let expandedRegions = new Set(); // allows more than one region row open at once
 
   function countryName(code) {
     if (!code || code === "XX") return i18n("regionUnknown", "Unknown");
@@ -3234,7 +3234,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const row = document.createElement("button");
         row.type = "button";
         row.className = "region-row region-row-toggle";
-        row.setAttribute("aria-expanded", String(expandedRegion === key));
+        row.setAttribute("aria-expanded", String(expandedRegions.has(key)));
 
         const left = document.createElement("span");
         left.className = "region-row-left";
@@ -3254,12 +3254,13 @@ document.addEventListener("DOMContentLoaded", () => {
         row.appendChild(countEl);
         row.addEventListener("click", (e) => {
           e.stopPropagation();
-          expandedRegion = (expandedRegion === key) ? null : key;
+          if (expandedRegions.has(key)) expandedRegions.delete(key);
+          else expandedRegions.add(key);
           renderRegions();
         });
         body.appendChild(row);
 
-        if (expandedRegion === key) {
+        if (expandedRegions.has(key)) {
           const countries = getCountries(key) || {};
           const countryEntries = Object.entries(countries)
             .filter(([, c]) => c > 0)
@@ -3293,7 +3294,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function openPanel(mode) {
     currentMode = mode;
-    expandedRegion = null;
+    expandedRegions.clear();
     if (titleEl) titleEl.textContent = i18n(mode === "total" ? "totalByRegionTitle" : "onlineByRegionTitle");
     renderRegions();
     overlay.classList.remove("hidden");

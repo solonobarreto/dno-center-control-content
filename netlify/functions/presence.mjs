@@ -123,6 +123,20 @@ export default async (req) => {
     }
   }
 
+  // Acessos antigos (de antes de existir o rastreamento por região/país nesta
+  // function) engordam "total" mas nunca entraram em nenhuma região — sem
+  // isso, a soma das regiões ficaria menor que o total exibido no topo, o
+  // que parecia "sumir" visitas ao abrir o detalhamento. Jogamos a diferença
+  // em "unknown" para a soma bater sempre com o total, deixando claro que
+  // esses acessos só não têm região conhecida (em vez de terem sumido).
+  const knownRegionSum = Object.values(totalRegionCounts).reduce((a, b) => a + b, 0);
+  const untracked = total - knownRegionSum;
+  if (untracked > 0) {
+    totalRegionCounts.unknown = (totalRegionCounts.unknown || 0) + untracked;
+    totalCountryCounts.unknown = totalCountryCounts.unknown || {};
+    totalCountryCounts.unknown.XX = (totalCountryCounts.unknown.XX || 0) + untracked;
+  }
+
   return new Response(JSON.stringify({
     count,
     regions: regionCounts,
