@@ -121,6 +121,377 @@ function renderClassNickLabel(labelEl, cls, nickname) {
 }
 window.renderClassNickLabel = renderClassNickLabel;
 
+// =========================================================
+// Criador de Composições — dados de buff/debuff por classe
+// (fonte: aba "BUFFS/DEBUFFS (DNO)" da planilha). Chaves batem
+// com os ids de ALL_CLASSES. "patk: '*'" = valor variável na
+// planilha original (não somado no total, mostrado como "*").
+// =========================================================
+const CLASS_COMP_DATA = {
+  barbarian:    { buff: { pdef: 30, mdef: 30 }, debuff: { patk: 50, matk: 50, critdmg: 20 }, buffs: ["Charging Howl"], debuffs: ["Devastating Howl", "Taunting Howl"] },
+  destroyer:    { buff: { pdef: 30, mdef: 30 }, debuff: { patk: 70, matk: 70, critdmg: 20 }, buffs: ["Charging Howl"], debuffs: ["Devastating Howl (Mastery II)", "Taunting Howl"] },
+  gladiator:    { buff: {}, debuff: { pdef: 50, mdef: 50 }, buffs: [""], debuffs: ["Provoking Slam"] },
+  moonlord:     { buff: {}, debuff: { pdef: 50, mdef: 80 }, buffs: [""], debuffs: ["Provoking Slam", "Cyclone Slash EX"] },
+  darkavenger:  { buff: { fire: 32 }, debuff: { fire: 28, pdef: 28, mdef: 28 }, buffs: ["Highlander"], debuffs: [] },
+  // silverhunter: ainda não tem dados de buff/debuff na planilha de origem.
+
+  tempest:      { buff: { cd: 40, crit: 20 }, debuff: { pdef: 30 }, buffs: ["Owl's Rage", "Spirit Boost"], debuffs: ["Binding Shot EX"] },
+  windwalker:   { buff: { cd: 40, crit: 20 }, debuff: {}, buffs: ["Owl's Rage", "Spirit Boost"], debuffs: [""] },
+  sentinel:     { buff: { crit: 20 }, debuff: { pdef: 30, mdef: 30, resist: 11 }, buffs: ["Owl's Rage"], debuffs: ["Bull's Eye"] },
+  sniper:       { buff: { crit: 20 }, debuff: { pdef: 30, mdef: 30, resist: 11 }, buffs: ["Owl's Rage"], debuffs: ["Bull's Eye"] },
+
+  obscuria:     { buff: { cd: 80 }, debuff: { dark: 40, mdef: 35, icestack: 50 }, buffs: ["Beyound Time"], debuffs: ["Glacial Spikes", "Force Mirror", "Gravity Ascension EX"] },
+  ilumia:       { buff: { cd: 80 }, debuff: { light: 10, mdef: 35, icestack: 50 }, buffs: ["Beyound Time"], debuffs: ["Glacial Spikes", "Force Mirror", "Linear Ray EX"] },
+  glaciana:     { buff: {}, debuff: { ice: 10, icestack: 100 }, buffs: [""], debuffs: ["Glacial Spikes", "Glacial Wave", "Blizzard Storm", "Ice Sphere"] },
+  saleana:      { buff: {}, debuff: { ice: 10, fire: 44, icestack: 100 }, buffs: [""], debuffs: ["Phoenix Storm (Mastery II)", "Inferno EX"] },
+
+  shootingstar: { buff: { mvspeed: 50 }, debuff: { patk: 60, matk: 60, light: 15, dark: 15, ice: 45, fire: 15, pdef: 20, mdef: 20, resist: 15 }, buffs: ["Wax"], debuffs: ["Chemical Granade", "Biochimical Missile EX"] },
+  gearmaster:   { buff: { mvspeed: 50 }, debuff: { patk: 60, matk: 60, light: 15, dark: 15, ice: 45, fire: 15, resist: 15 }, buffs: ["Wax"], debuffs: ["Chemical Granade"] },
+  adept:        { buff: { acspeed: 36, mvspeed: 50, cd: 15, str: 20, agi: 20, int: 20 }, debuff: { pdef: 20, mdef: 20, resist: 20, light: 20, dark: 20, ice: 50, fire: 20, icestack: 50 }, buffs: ["Wax", "Cocktail", "Injector"], debuffs: ["Engine Colant", "C2H50H"] },
+  physician:    { buff: { acspeed: 36, mvspeed: 50, fd: 50, cd: 15, str: 20, agi: 20, int: 20 }, debuff: { ice: 30, pdef: 33, mdef: 33 }, buffs: ["Wax", "Cocktail", "Injector EX"], debuffs: [] },
+
+  crusader:     { buff: { light: 30, ice: 30, fire: 30 }, debuff: { critdmg: 16, light: 45, pdef: 39, mdef: 39 }, buffs: ["Elemental Aura"], debuffs: ["Charge Bolt", "Provoke", "Armor Break", "Lightning Zap EX", "Smite EX"] },
+  guardian:     { buff: { light: 30, ice: 30, fire: 30 }, debuff: { critdmg: 16, light: 45, pdef: 39, mdef: 39 }, buffs: ["Elemental Aura"], debuffs: ["Charge Bolt", "Provoke", "Armor Break", "Lightning Zap", "Smite"] },
+  inquisitor:   { buff: { light: 25, ice: 15, fire: 15, patk: 21, matk: 21, pdef: 24, mdef: 24 }, debuff: { light: 63, patk: 70, matk: 70 }, buffs: ["Blessing of Light", "Protection Shell", "Striking", "Cure Relic"], debuffs: ["Charge Bolt", "Lightning Bolt EX", "Chain Lightning EX", "Heaven's Judgment", "Consecration", "Miracle Relic"] },
+  saint:        { buff: { mvspeed: 15, light: 25, ice: 15, fire: 15, patk: 21, matk: 21,  pdef: 24, mdef: 24 }, debuff: { light: 48, patk: 70, matk: 70 }, buffs: ["Blessing of Light", "Protection Shell", "Striking", "Cure Relic EX"], debuffs: ["Charge Bolt", "Lightning Bolt", "Chain Lightning", "Heaven's Judgment", "Miracle Relic"] },
+
+  spiritdancer: { buff: { str:80, agi: 80, int: 80, vit: 80, pdef: 35, mdef: 35 }, debuff: {}, buffs: ["Gennie", "Phantom Guard", "Ecstatic Dance 2"], debuffs: [] },
+  bladedancer:  { buff: { str:80, agi: 80, int: 80, vit: 80, pdef: 35, mdef: 35 }, debuff: {}, buffs: ["Gennie", "Phantom Guard", "Ecstatic Dance 2"], debuffs: [] },
+  souleater:    { buff: { cd: 20, str:80, agi: 80, int: 80, vit: 80, patk: 35, matk: 35, pdef: 24, mdef: 24 }, debuff: { pdef: 5, mdef: 5, light: 5, dark: 5, ice: 5, fire: 5 }, buffs: ["Phantom Guard", "Gennie", "Soul Scream","Grudge Formation"], debuffs: ["Beast Spirit EX","Soul Gate EX", "Cling Snake EX", "Spirit Paper EX"] },
+  darksummoner: { buff: { str:80, agi: 80, int: 80, vit: 80, dark: 28.5, patk: 35, matk: 35, fd: 13.5 }, debuff: { patk: 5, matk: 5, light: 5, dark: 5, ice: 5, fire: 5 }, buffs: ["Gennie", "Phantom Guard", "Grudge Formation", "Sadism Pleasure"], debuffs: ["Beast Spirit","Soul Gate", "Cling Snake", "Spirit Paper"] },
+
+  abysswalker:  { buff: { light: 14, dark: 53 }, debuff: { dark: 20, pdef: 32, mdef: 32 }, buffs: ["Raid", "Blessing of Ajna", "Incarnation of the Dark"], debuffs: ["Nightfall"] },
+  lightfury:    { buff: { mvspeed: 50, fd: 10, light: 14, dark: 28, patk: 46.8, matk: 46.8, pdef: 75, mdef: 75 }, debuff: { light: 10, patk: 25, matk: 25 }, buffs: ["Raid", "Blessing of Ajna", "Chakra Ring", "Chakra Miracle"], debuffs: ["Sunshine Sparks"] },
+  raven:        { buff: {}, debuff: { dark: 30, pdef: 20, mdef: 20 }, buffs: ["Raid", "Dedicate Crow"], debuffs: ["Applause","Punishment"] },
+  ripper:       { buff: { fire: 30 }, debuff: { fire: 15, pdef: 20, mdef: 20 }, buffs: ["Raid", "Dedicate Crow"], debuffs: ["Applause","Punishment"] },
+
+  valkyrie:     { buff: { light: 16, patk: 20, matk: 20, mdef: 14, pdef: 14 }, debuff: { light: 16 }, buffs: ["Harmonize", "Scar Maker", "Will Maker"], debuffs: ["Arcane Focus"] },
+  flurry:       { buff: { patk: 20, matk: 20 }, debuff: { resist: 20 }, buffs: ["Harmonize", "Scar Maker", "Will Maker"], debuffs: ["Stab Screw EX"] },
+
+  ruina:        { buff: { patk: "*", fd: 30 }, debuff: { light: 30, dark: 30, ice: 30, fire: 30, pdef: 30, mdef: 30 }, buffs: ["Overhowl"], debuffs: [] },
+  defensio:     { buff: { patk: "*", fd: 30 }, debuff: { pdef: 12, mdef: 12 }, buffs: ["Overhowl"], debuffs: [] }
+};
+
+// O segundo item de cada par é a chave de tradução (window.TRANSLATIONS),
+// não mais o texto fixo em português — renderCompStatGrid busca o rótulo
+// no idioma atual via i18n(), com o texto em pt-BR como fallback.
+const COMP_DEBUFF_FIELDS = [
+  ["pdef",  "statPDef", "DEF Física"],       ["mdef",  "statMDef", "DEF Mágica"],
+  ["patk",  "statPAtk", "ATK Físico"],       ["matk",  "statMAtk", "ATK Mágico"],
+  ["light", "statLight", "Luz"],             ["dark",  "statDark", "Trevas"],
+  ["ice",   "statIce", "Gelo"],              ["fire",  "statFire", "Fogo"],
+  ["resist","statResistCrit", "Resist. Crítico"],["critdmg","statCritDmg", "Dano Crítico"],
+  ["icestack","statIceAmp", "Amp. Gelo"]
+];
+const COMP_BUFF_FIELDS = [
+  ["pdef", "statPDef", "DEF Física"],        ["mdef", "statMDef", "DEF Mágica"],
+  ["patk", "statPAtk", "ATK Físico"],        ["matk", "statMAtk", "ATK Mágico"],
+  ["str",  "statStr", "Força"],              ["agi",  "statAgi", "Agilidade"],
+  ["int",  "statInt", "Inteligência"],       ["vit",  "statVit", "Vitality"],
+  ["light","statLight", "Luz"],              ["dark", "statDark", "Trevas"],
+  ["ice", "statIce", "Gelo"],                ["fire", "statFire", "Fogo"],
+  ["mvspeed", "statMoveSpeed", "Mov. Speed"],["acspeed", "statActSpeed", "Act. Speed"],
+  ["cd", "statCdReduction", "Red. Recarga"], ["crit", "statCritical", "Critical"],
+  ["fd", "statFinalDmg", "Amp. Final Damage"]
+];
+const COMP_SLOTS_KEY = "dnOriginsCompMaker";
+const COMP_SLOT_COUNT = 8;
+
+function loadCompSlots() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COMP_SLOTS_KEY) || "[]");
+    const arr = Array.isArray(raw) ? raw.slice(0, COMP_SLOT_COUNT) : [];
+    while (arr.length < COMP_SLOT_COUNT) arr.push(null);
+    return arr;
+  } catch (_) {
+    return new Array(COMP_SLOT_COUNT).fill(null);
+  }
+}
+let compSlots = loadCompSlots();
+function saveCompSlots() {
+  try { localStorage.setItem(COMP_SLOTS_KEY, JSON.stringify(compSlots)); } catch (_) {}
+}
+
+function computeCompTotals() {
+  const debuffTotals = {}; COMP_DEBUFF_FIELDS.forEach(([k]) => debuffTotals[k] = 0);
+  const buffTotals = {}; COMP_BUFF_FIELDS.forEach(([k]) => buffTotals[k] = 0);
+  const buffList = [];
+  const debuffList = [];
+  let hasVariablePatk = false;
+
+  compSlots.forEach((clsId) => {
+    if (!clsId) return;
+    const data = CLASS_COMP_DATA[clsId];
+    const cls = ALL_CLASSES.find((c) => c.id === clsId);
+    if (!data) {
+      buffList.push({ classId: clsId, name: cls ? getClassName(cls) : clsId, buffs: [] });
+      debuffList.push({ classId: clsId, name: cls ? getClassName(cls) : clsId, debuffs: [] });
+      return;
+    }
+    COMP_DEBUFF_FIELDS.forEach(([k]) => { debuffTotals[k] += (data.debuff && data.debuff[k]) || 0; });
+    COMP_BUFF_FIELDS.forEach(([k]) => {
+      const v = data.buff && data.buff[k];
+      if (v === "*") { hasVariablePatk = true; return; }
+      buffTotals[k] += v || 0;
+    });
+    if (data.buffs && data.buffs.length) {
+      buffList.push({ classId: clsId, name: cls ? getClassName(cls) : clsId, buffs: data.buffs, cd: data.cd || null });
+    }
+    debuffList.push({ classId: clsId, name: cls ? getClassName(cls) : clsId, debuffs: (data.debuffs || []) });
+  });
+
+  return { debuffTotals, buffTotals, buffList, debuffList, hasVariablePatk };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const openCompMakerBtn = document.getElementById("openCompMakerBtn");
+  const compMakerOverlay = document.getElementById("compMakerOverlay");
+  const closeCompMakerBtn = document.getElementById("closeCompMakerBtn");
+  const compMakerBody = document.getElementById("compMakerBody");
+  const compSlotsEl = document.getElementById("compSlots");
+  const compClassDropdown = document.getElementById("compClassDropdown");
+  const compDebuffGrid = document.getElementById("compDebuffGrid");
+  const compBuffGrid = document.getElementById("compBuffGrid");
+  const compClassBuffsEl = document.getElementById("compClassBuffs");
+  const compClassDebuffsEl = document.getElementById("compClassDebuffs");
+  const compMakerClearBtn = document.getElementById("compMakerClearBtn");
+  const sideMenuOverlay = document.getElementById("sideMenuOverlay");
+  const closeSideMenuBtn = document.getElementById("closeSideMenuBtn");
+  const compDebuffSlide = document.getElementById("compDebuffSlide");
+  const compBuffSlide   = document.getElementById("compBuffSlide");
+  const compDebuffToggle = document.getElementById("compDebuffToggle");
+  const compBuffToggle   = document.getElementById("compBuffToggle");
+  const compDebuffSlideBack = document.getElementById("compDebuffSlideBack");
+  const compBuffSlideBack   = document.getElementById("compBuffSlideBack");
+  if (!openCompMakerBtn || !compMakerOverlay) return; // segurança caso o HTML ainda não tenha sido atualizado
+
+  function openSlide(panel) { panel.classList.add("comp-slide-open"); }
+  function closeSlide(panel) { panel.classList.remove("comp-slide-open"); }
+
+  // Abre slide "exclusivos" animando por cima do painel principal (que permanece visível por baixo)
+  // Voltar: fecha o slide atual → o painel principal fica exposto novamente (mesma mecânica)
+  if (compDebuffToggle) {
+    compDebuffToggle.addEventListener("click", () => openSlide(compDebuffSlide));
+    compDebuffToggle.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openSlide(compDebuffSlide); });
+  }
+  if (compBuffToggle) {
+    compBuffToggle.addEventListener("click", () => openSlide(compBuffSlide));
+    compBuffToggle.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openSlide(compBuffSlide); });
+  }
+  if (compDebuffSlideBack) compDebuffSlideBack.addEventListener("click", () => closeSlide(compDebuffSlide));
+  if (compBuffSlideBack)   compBuffSlideBack.addEventListener("click", () => closeSlide(compBuffSlide));
+
+  function renderCompStatGrid(container, fields, totals, opts) {
+    container.innerHTML = "";
+    fields.forEach(([key, labelKey, labelFallback]) => {
+      const val = totals[key] || 0;
+      const cell = document.createElement("div");
+      cell.className = "comp-stat-cell" + (val ? " comp-stat-cell-active" : "");
+      const labelEl = document.createElement("span");
+      labelEl.className = "comp-stat-label";
+      labelEl.textContent = i18n(labelKey, labelFallback);
+      const valueEl = document.createElement("span");
+      valueEl.className = "comp-stat-value";
+      const rounded = Math.round(val * 100) / 100;
+      let text;
+      if (opts && opts.isDebuff) {
+        text = (rounded ? "-" : "") + rounded + "%";
+      } else {
+        text = (rounded > 0 ? "+" : "") + rounded + "%";
+        if (opts && opts.variable && key === "patk") text += " + *";
+      }
+      valueEl.textContent = text;
+      cell.appendChild(labelEl);
+      cell.appendChild(valueEl);
+      container.appendChild(cell);
+    });
+  }
+
+  function renderCompResults() {
+    const { debuffTotals, buffTotals, buffList, debuffList, hasVariablePatk } = computeCompTotals();
+    renderCompStatGrid(compDebuffGrid, COMP_DEBUFF_FIELDS, debuffTotals, { isDebuff: true });
+    renderCompStatGrid(compBuffGrid, COMP_BUFF_FIELDS, buffTotals, { variable: hasVariablePatk });
+
+    // --- Slide panel: Debuffs exclusivos por classe ---
+    // Rótulo classe/skills segue a mesma fonte e layout do rótulo
+    // "Classe \"Nickname\"" da coluna de classe da tabela principal
+    // (classe em Cinzel/dourado, skills em itálico mais suave).
+    compClassDebuffsEl.innerHTML = "";
+    debuffList.forEach(({ classId, name, debuffs }) => {
+      const row = document.createElement("div");
+      row.className = "comp-class-buff-row";
+      const img = document.createElement("img");
+      img.src = `img/${classId}.png`;
+      img.alt = "";
+      row.appendChild(img);
+
+      const textWrap = document.createElement("span");
+      textWrap.className = "comp-class-buff-text";
+
+      const classSpan = document.createElement("span");
+      classSpan.className = "comp-class-buff-classname";
+      classSpan.textContent = `${name}:`;
+      textWrap.appendChild(classSpan);
+
+      const skillsSpan = document.createElement("span");
+      skillsSpan.className = "comp-class-buff-skills";
+      skillsSpan.textContent = debuffs.length ? debuffs.join(", ") : i18n("compEmptyPlaceholder", "(preencher)");
+      if (!debuffs.length) skillsSpan.classList.add("comp-class-buff-empty");
+      textWrap.appendChild(skillsSpan);
+
+      row.appendChild(textWrap);
+      compClassDebuffsEl.appendChild(row);
+    });
+
+    // --- Slide panel: Buffs exclusivos por classe ---
+    compClassBuffsEl.innerHTML = "";
+    if (hasVariablePatk) {
+      const note = document.createElement("p");
+      note.className = "comp-variable-note";
+      note.textContent = i18n("compVariableNote", "* ATK Físico com valor variável nessa(s) classe(s) — não incluso na soma.");
+      compClassBuffsEl.appendChild(note);
+    }
+    buffList.forEach(({ classId, name, buffs, cd }) => {
+      const row = document.createElement("div");
+      row.className = "comp-class-buff-row";
+      const img = document.createElement("img");
+      img.src = `img/${classId}.png`;
+      img.alt = "";
+      row.appendChild(img);
+
+      const textWrap = document.createElement("span");
+      textWrap.className = "comp-class-buff-text";
+
+      const classSpan = document.createElement("span");
+      classSpan.className = "comp-class-buff-classname";
+      classSpan.textContent = `${name}:`;
+      textWrap.appendChild(classSpan);
+
+      const skillsSpan = document.createElement("span");
+      skillsSpan.className = "comp-class-buff-skills";
+      let buffText = buffs.length ? buffs.join(", ") : "—";
+      if (cd) buffText += ` · CD: -${cd}%`;
+      skillsSpan.textContent = buffText;
+      textWrap.appendChild(skillsSpan);
+
+      row.appendChild(textWrap);
+      compClassBuffsEl.appendChild(row);
+    });
+  }
+
+  function closeCompClassDropdown() {
+    compClassDropdown.classList.add("hidden");
+  }
+
+  function openCompClassPicker(idx, anchorEl) {
+    compClassDropdown.innerHTML = "";
+    // Mesma ordem da lista de classes da tela inicial (botão de +),
+    // sem reordenar por ordem alfabética.
+    ALL_CLASSES.forEach((cls) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "class-icon-btn";
+      btn.title = getClassName(cls);
+      const img = document.createElement("img");
+      img.src = `img/${cls.id}.png`;
+      img.alt = "";
+      btn.appendChild(img);
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        compSlots[idx] = cls.id;
+        saveCompSlots();
+        closeCompClassDropdown();
+        renderCompMaker();
+      });
+      compClassDropdown.appendChild(btn);
+    });
+
+    const bodyRect = compMakerBody.getBoundingClientRect();
+    const anchorRect = anchorEl.getBoundingClientRect();
+    compClassDropdown.style.left = (anchorRect.left - bodyRect.left + compMakerBody.scrollLeft) + "px";
+    compClassDropdown.style.top = (anchorRect.bottom - bodyRect.top + compMakerBody.scrollTop + 4) + "px";
+    compClassDropdown.classList.remove("hidden");
+  }
+
+  function renderCompMaker() {
+    compSlotsEl.innerHTML = "";
+    compSlots.forEach((clsId, idx) => {
+      const slot = document.createElement("div");
+      slot.className = "comp-slot" + (clsId ? "" : " comp-slot-empty");
+
+      if (clsId) {
+        const cls = ALL_CLASSES.find((c) => c.id === clsId);
+        const img = document.createElement("img");
+        img.src = `img/${clsId}.png`;
+        img.alt = cls ? getClassName(cls) : clsId;
+        slot.appendChild(img);
+
+        const label = document.createElement("span");
+        label.className = "comp-slot-label";
+        label.textContent = cls ? getClassName(cls) : clsId;
+        slot.appendChild(label);
+
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "comp-slot-remove";
+        removeBtn.textContent = "✕";
+        removeBtn.title = i18n("compRemoveTitle", "Remover");
+        removeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          compSlots[idx] = null;
+          saveCompSlots();
+          renderCompMaker();
+        });
+        slot.appendChild(removeBtn);
+      } else {
+        slot.textContent = "+";
+      }
+
+      slot.addEventListener("click", () => openCompClassPicker(idx, slot));
+      compSlotsEl.appendChild(slot);
+    });
+
+    renderCompResults();
+  }
+
+  openCompMakerBtn.addEventListener("click", () => {
+    if (sideMenuOverlay) sideMenuOverlay.classList.add("hidden");
+    compMakerOverlay.classList.remove("hidden");
+    renderCompMaker();
+  });
+  if (closeSideMenuBtn) { /* no-op: mantém o listener original do menu lateral intacto */ }
+
+  function closeCompMaker() {
+    compMakerOverlay.classList.add("hidden");
+    closeCompClassDropdown();
+    if (compDebuffSlide) closeSlide(compDebuffSlide);
+    if (compBuffSlide)   closeSlide(compBuffSlide);
+  }
+  closeCompMakerBtn.addEventListener("click", closeCompMaker);
+  compMakerOverlay.addEventListener("click", (e) => {
+    if (e.target === compMakerOverlay) closeCompMaker();
+  });
+  document.addEventListener("click", (e) => {
+    if (!compClassDropdown.classList.contains("hidden") &&
+        !compClassDropdown.contains(e.target) &&
+        !e.target.closest(".comp-slot")) {
+      closeCompClassDropdown();
+    }
+  });
+  compMakerClearBtn.addEventListener("click", () => {
+    compSlots = new Array(COMP_SLOT_COUNT).fill(null);
+    saveCompSlots();
+    renderCompMaker();
+  });
+
+  // Exposto para que a troca de idioma (index.html / listener de .lang-item)
+  // possa re-renderizar os rótulos dinâmicos do Criador de Composição
+  // (grade de stats, título "Remover", texto "(preencher)" etc.) — os
+  // textos estáticos do modal (hint, títulos de painel, botão Limpar) já
+  // são cobertos pelo data-i18n/applyTranslations.
+  window.refreshCompMaker = renderCompMaker;
+});
+
 // Re-labels every already-rendered class icon (dropdown grid + character
 // rows) after the user switches languages. Exposed on window so the
 // language-selection code in index.html can call it.
@@ -1639,6 +2010,7 @@ document.addEventListener("DOMContentLoaded", () => {
       closeSideMenuNew();
       if (typeof applyTranslations === "function") applyTranslations(item.dataset.lang);
       if (typeof refreshClassLabels === "function") refreshClassLabels();
+      if (typeof window.refreshCompMaker === "function") window.refreshCompMaker();
       refreshContentLabels();
       if (typeof window.updateDailyCountdowns === "function") window.updateDailyCountdowns(); // sincroniza o "Reset em" na hora, em vez de esperar o próximo tick
     };
@@ -3624,31 +3996,43 @@ document.addEventListener("DOMContentLoaded", () => {
     // Avoid redundant saves: skip if content hasn't changed since last save.
     if (jsonStr === lastSavedHash) return;
 
-    if (supportsFsAccess) {
-      const handle = await getStoredHandle();
-      if (handle && (await hasPermission(handle))) {
-        try {
-          const writable = await handle.createWritable();
-          await writable.write(jsonStr);
-          await writable.close();
-          lastSavedHash = jsonStr;
-          flashBtn();
-          return;
-        } catch (_) {
-          // Handle went stale (file/pasta movida ou apagada) — cai no fallback abaixo.
-        }
-      } else {
-        // Ainda não temos um arquivo escolhido, ou a permissão expirou e não
-        // há gesto do usuário agora para repedi-la. Não há como salvar
-        // silenciosamente neste momento; espera o usuário clicar no botão
-        // novamente (verifyPermissionWithPrompt cuida disso no listener de click).
-        return;
-      }
+    // Sem suporte à File System Access API: único caso em que o fallback de
+    // download avulso faz sentido, pois não há como sobrescrever um arquivo
+    // específico de jeito nenhum neste navegador.
+    if (!supportsFsAccess) {
+      legacyDownloadSave(jsonStr);
+      lastSavedHash = jsonStr;
+      flashBtn();
+      return;
     }
 
-    legacyDownloadSave(jsonStr);
-    lastSavedHash = jsonStr;
-    flashBtn();
+    const handle = await getStoredHandle();
+    if (handle && (await hasPermission(handle))) {
+      try {
+        const writable = await handle.createWritable();
+        await writable.write(jsonStr);
+        await writable.close();
+        lastSavedHash = jsonStr;
+        flashBtn();
+      } catch (_) {
+        // A escrita no arquivo/pasta escolhido falhou (arquivo movido/apagado,
+        // permissão perdida, etc). Antes, esse erro caía no download avulso —
+        // que salva sempre na pasta Downloads padrão com um novo nome
+        // ("(1)", "(2)"...), em vez de atualizar o arquivo/pasta escolhido.
+        // Era exatamente esse o bug relatado, então não fazemos mais isso:
+        // apenas avisamos e esperamos o usuário reconectar.
+        if (window.showToast) {
+          window.showToast("⚠️ Auto-save não conseguiu gravar no arquivo escolhido — desative e reative o botão Auto para reconectar");
+        }
+      }
+      return;
+    }
+
+    // Ainda não há um arquivo escolhido, ou a permissão expirou e não há
+    // gesto do usuário agora para repedi-la. Não há como salvar
+    // silenciosamente neste momento nem, principalmente, salvar em outro
+    // lugar — espera o usuário clicar no botão novamente
+    // (verifyPermissionWithPrompt cuida disso no listener de click).
   }
 
   function scheduleAutoSave() {
