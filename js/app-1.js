@@ -128,11 +128,11 @@ window.renderClassNickLabel = renderClassNickLabel;
 // planilha original (não somado no total, mostrado como "*").
 // =========================================================
 const CLASS_COMP_DATA = {
-  barbarian:    { buff: { pdef: 30, mdef: 30 }, debuff: { patk: 50, matk: 50, critdmg: 20 }, buffs: [ "Charging Howl" ], debuffs: [ "Devastating Howl", "Taunting Howl" ], variableBuffs: [ "Highlander", "Battle Howl" ] },
-  destroyer:    { buff: { pdef: 30, mdef: 30 }, debuff: { patk: 70, matk: 70, critdmg: 20 }, buffs: [ "Charging Howl" ], debuffs: [ "Devastating Howl EX", "Taunting Howl" ], variableBuffs: [ "Highlander", "Battle Howl" ] },
-  gladiator:    { buff: {}, debuff: { pdef: 50, mdef: 50 }, buffs: [ "" ], debuffs: [ "Piercing Thrust" ], variableBuffs: [ "Highlander" ] },
-  moonlord:     { buff: {}, debuff: { pdef: 50, mdef: 80 }, buffs: [ "" ], debuffs: [ "Piercing Thrust", "Cyclone Slash EX" ], variableBuffs: [ "Highlander" ] },
-  darkavenger:  { buff: { fire: 28 }, debuff: { fire: 28, pdef: 28, mdef: 28 }, buffs: [ "Shadow Call" ], debuffs: [ "Avenger Force", "Soul Cutter" ], variableBuffs: [ "Highlander" ] },
+  barbarian:    { buff: { pdef: 30, mdef: 30 }, debuff: { patk: 50, matk: 50, critdmg: 20 }, buffs: [ "Charging Howl" ], debuffs: [ "Devastating Howl", "Taunting Howl" ] },
+  destroyer:    { buff: { pdef: 30, mdef: 30 }, debuff: { patk: 70, matk: 70, critdmg: 20 }, buffs: [ "Charging Howl" ], debuffs: [ "Devastating Howl EX", "Taunting Howl" ] },
+  gladiator:    { buff: {}, debuff: { pdef: 50, mdef: 50 }, buffs: [ "" ], debuffs: [ "Piercing Thrust" ] },
+  moonlord:     { buff: {}, debuff: { pdef: 50, mdef: 80 }, buffs: [ "" ], debuffs: [ "Piercing Thrust", "Cyclone Slash EX" ] },
+  darkavenger:  { buff: { fire: 28 }, debuff: { fire: 28, pdef: 28, mdef: 28 }, buffs: [ "Shadow Call" ], debuffs: [ "Avenger Force", "Soul Cutter" ] },
   // silverhunter: ainda não tem dados de buff/debuff na planilha de origem.
 
   tempest:      { buff: { mvspeed: 40, cd: 40, crit: 100 }, debuff: { pdef: 30 }, buffs: [ "Owls Insight", "Owls Rage", "Spirit Boost" ], debuffs: [ "Binding Shot EX" ] },
@@ -140,36 +140,36 @@ const CLASS_COMP_DATA = {
   sentinel:     { buff: { crit: 100 }, debuff: { pdef: 30, mdef: 30, resist: 11 }, buffs: [ "Owls Insight", "Owls Rage" ], debuffs: [ "Bulls Eye" ] },
   sniper:       { buff: { crit: 100 }, debuff: { pdef: 30, mdef: 30, resist: 11 }, buffs: [ "Owls Insight", "Owls Rage" ], debuffs: [ "Bulls Eye" ] },
 
-  obscuria:     { buff: { mvspeed: 10, cd: 80 }, debuff: { dark: 40, mdef: 35, icestack: 50 }, buffs: [ "Mana Flow", "Beyond Time" ], debuffs: [ "Glacial Spikes", "Force Mirror", "Gravity Ascension EX" ] },
-  ilumia:       { buff: { mvspeed: 10, cd: 80 }, debuff: { light: 10, mdef: 35, icestack: 50 }, buffs: [ "Mana Flow", "Beyond Time" ], debuffs: [ "Glacial Spikes", "Force Mirror", "Linear Ray EX" ] },
-  glaciana:     { buff: { mvspeed: 10 }, debuff: { ice: 10, icestack: 100 }, buffs: [ "Mana Flow" ], debuffs: [ "Glacial Spikes", "Frost Wind", "Icy Shards", "Freezing Field EX", "Freezing Spikes", "Chilling Mist", "Glacial Wave", "Blizzard Storm", "Ice Sphere" ] },
+  obscuria:     { buff: { mvspeed: 10, cd: 80 }, debuff: { dark: 40, mdef: 35, icestack: 50 }, buffs: ["Mana Flow", "Beyond Time" ], debuffs: [ "Glacial Spikes", "Force Mirror", "Gravity Ascension EX" ] },
+  ilumia:       { buff: { mvspeed: 10, cd: 80 }, debuff: { light: 10, mdef: 35, icestack: 50 }, buffs: ["Mana Flow", "Beyond Time" ], debuffs: [ "Glacial Spikes", "Force Mirror", "Linear Ray EX" ] },
+  glaciana:     { buff: { mvspeed: 10 }, debuff: { ice: 10, icestack: 100 }, buffs: ["Mana Flow"], debuffs: [ "Glacial Spikes", "Frost Wind", "Icy Shards", "Freezing Field EX", "Freezing Spikes", "Chilling Mist", "Glacial Wave", "Blizzard Storm", "Ice Sphere" ] },
   saleana:      { buff: { mvspeed: 10 }, debuff: { ice: 10, fire: 44, icestack: 100 }, buffs: [ "Mana Flow" ], debuffs: [ "Glacial Spikes", "Frost Wind", "Glacial Wave", "Phoenix Storm EX", "Inferno EX" ] },
 
   shootingstar: { buff: { mvspeed: 50 }, debuff: { patk: 60, matk: 60, light: 15, dark: 15, ice: 45, fire: 15, pdef: 20, mdef: 20, resist: 15 }, buffs: [ "Wax" ], debuffs: [ "Chemical Granade", "Chemical Missile EX" ] },
   gearmaster:   { buff: { mvspeed: 50 }, debuff: { patk: 60, matk: 60, light: 15, dark: 15, ice: 45, fire: 15, resist: 15 }, buffs: [ "Wax" ], debuffs: [ "Chemical Granade" ] },
-  adept:        { buff: { acspeed: 36, mvspeed: 50, cd: 15, str: 20, agi: 20, int: 20 }, debuff: { pdef: 20, mdef: 20, resist: 20, light: 20, dark: 20, ice: 50, fire: 20, icestack: 50 }, buffs: [ "Wax", "Cocktail", "Injector" ], debuffs: ["Engine Coolant", "C2H50H", "Ice Beam" ] },
+  adept:        { buff: { acspeed: 36, mvspeed: 50, cd: 15, str: 20, agi: 20, int: 20 }, debuff: { pdef: 20, mdef: 20, resist: 20, light: 20, dark: 20, ice: 50, fire: 20, icestack: 50 }, buffs: [ "Wax", "Cocktail", "Injector" ], debuffs: ["Engine Coolant", "C2H50H"] },
   physician:    { buff: { acspeed: 36, mvspeed: 50, fd: 50, cd: 15, str: 20, agi: 20, int: 20 }, debuff: { ice: 30, pdef: 33, mdef: 33 }, buffs: [ "Wax", "Cocktail", "Injector EX" ], debuffs: [ "Engine Coolant", "Love Virus" ] },
 
-  crusader:     { buff: { light: 30, ice: 30, fire: 30 }, debuff: { critdmg: 16, light: 45, pdef: 39, mdef: 39 }, buffs: [ "Elemental Aura" ], debuffs: [ "Charge Bolt", "Provoke", "Armor Break", "Lightning Zap", "Smite" ], variableBuffs: [ "Aura Restoration" ] },
-  guardian:     { buff: { light: 30, ice: 30, fire: 30 }, debuff: { critdmg: 16, light: 45, pdef: 39, mdef: 39 }, buffs: [ "Elemental Aura" ], debuffs: [ "Charge Bolt", "Provoke", "Armor Break", "Lightning Zap", "Smite" ], variableBuffs: [ "Aura Restoration" ] },
-  inquisitor:   { buff: { light: 25, ice: 15, fire: 15, patk: 21, matk: 21, pdef: 24, mdef: 24 }, debuff: { light: 63, patk: 70, matk: 70 }, buffs: [ "Blessing of Light", "Protection Shell", "Striking", "Cure Relic" ], debuffs: [ "Charge Bolt", "Lightning Bolt", "Mind Breaker EX", "Chain Lightning", "Heavens Judgment", "Consecration", "Miracle Relic" ], variableBuffs: [ "Aura Restoration" ] },
-  saint:        { buff: { mvspeed: 15, light: 25, ice: 15, fire: 15, patk: 21, matk: 21,  pdef: 24, mdef: 24 }, debuff: { light: 48, patk: 70, matk: 70 }, buffs: ["Blessing of Light", "Protection Shell", "Striking", "Cure Relic EX" ], debuffs: [ "Charge Bolt", "Lightning Bolt", "Chain Lightning", "Binding Relic EX", "Heavens Judgment", "Miracle Relic" ], variableBuffs: [ "Aura Restoration" ] },
+  crusader:     { buff: { light: 30, ice: 30, fire: 30 }, debuff: { critdmg: 16, light: 45, pdef: 39, mdef: 39 }, buffs: [ "Elemental Aura" ], debuffs: [ "Charge Bolt", "Provoke", "Armor Break", "Lightning Zap", "Smite" ] },
+  guardian:     { buff: { light: 30, ice: 30, fire: 30 }, debuff: { critdmg: 16, light: 45, pdef: 39, mdef: 39 }, buffs: [ "Elemental Aura" ], debuffs: [ "Charge Bolt", "Provoke", "Armor Break", "Lightning Zap", "Smite" ] },
+  inquisitor:   { buff: { light: 25, ice: 15, fire: 15, patk: 21, matk: 21, pdef: 24, mdef: 24 }, debuff: { light: 63, patk: 70, matk: 70 }, buffs: [ "Blessing of Light", "Protection Shell", "Striking", "Cure Relic" ], debuffs: [ "Charge Bolt", "Lightning Bolt", "Mind Breaker EX", "Chain Lightning", "Heavens Judgment", "Consecration", "Miracle Relic" ] },
+  saint:        { buff: { mvspeed: 15, light: 25, ice: 15, fire: 15, patk: 21, matk: 21,  pdef: 24, mdef: 24 }, debuff: { light: 48, patk: 70, matk: 70 }, buffs: ["Blessing of Light", "Protection Shell", "Striking", "Cure Relic EX" ], debuffs: [ "Charge Bolt", "Lightning Bolt", "Chain Lightning", "Binding Relic EX", "Heavens Judgment", "Miracle Relic" ] },
 
-  spiritdancer: { buff: { str:80, agi: 80, int: 80, vit: 80, pdef: 35, mdef: 35 }, debuff: {}, buffs: [ "Phantom Guard", "Genie" ], debuffs: [ "" ], variableBuffs: [ "Ecstatic Dance 2 EX" ] },
-  bladedancer:  { buff: { str:80, agi: 80, int: 80, vit: 80, pdef: 35, mdef: 35 }, debuff: {}, buffs: [ "Phantom Guard", "Genie" ], debuffs: [ "" ], variableBuffs: [ "Ecstatic Dance 2 EX" ] },
+  spiritdancer: { buff: { str:80, agi: 80, int: 80, vit: 80, pdef: 35, mdef: 35 }, debuff: {}, buffs: [ "Phantom Guard", "Genie", "Ecstatic Dance 2 EX" ], debuffs: [ "" ] },
+  bladedancer:  { buff: { str:80, agi: 80, int: 80, vit: 80, pdef: 35, mdef: 35 }, debuff: {}, buffs: [ "Phantom Guard", "Genie", "Ecstatic Dance 2 EX" ], debuffs: [ "" ] },
   souleater:    { buff: { cd: 20, str:80, agi: 80, int: 80, vit: 80, patk: 35, matk: 35, pdef: 24, mdef: 24 }, debuff: { pdef: 5, mdef: 5, light: 5, dark: 5, ice: 5, fire: 5 }, buffs: [ "Phantom Guard", "Genie", "Grudge Formation", "Soul Scream"], debuffs: [ "Spirit Paper" ,"Soul Gate", "Beast Spirit" ] },
   darksummoner: { buff: { str:80, agi: 80, int: 80, vit: 80, dark: 28.5, patk: 35, matk: 35, fd: 12 }, debuff: { patk: 5, matk: 5, light: 5, dark: 5, ice: 5, fire: 5 }, buffs: ["Phantom Guard", "Genie", "Grudge Formation", "Sadism Pleasure"], debuffs: ["Spirit Paper" ,"Soul Gate", "Beast Spirit" ] },
 
-  abysswalker:  { buff: { light: 14, dark: 53 }, debuff: { dark: 20, pdef: 32, mdef: 32 }, buffs: ["Blessing of Ajna", "Incarnation of the Dark" ], debuffs: [ "Nightfall" ], variableBuffs: [ "Raid" ] },
-  lightfury:    { buff: { mvspeed: 50, fd: 10, light: 14, dark: 28, patk: 46.8, matk: 46.8, pdef: 75, mdef: 75 }, debuff: { light: 10, patk: 25, matk: 25 }, buffs: [ "Blessing of Ajna", "Chakra Ring", "Chakra Miracle", , "Chakra Heal EX" ], debuffs: ["Sunshine Sparks"], variableBuffs: [ "Raid" ] },
-  raven:        { buff: {}, debuff: { dark: 30, pdef: 20, mdef: 20 }, buffs: [ "" ], debuffs: [ "Applause EX","Punishment EX" ], variableBuffs: [ "Raid", "Dedicate Crow" ] },
-  ripper:       { buff: { fire: 30 }, debuff: { fire: 15, pdef: 20, mdef: 20 }, buffs: [ "Arsonist" ], debuffs: [ "Applause","Punishment", "Blade Runner EX" ], variableBuffs: [ "Raid", "Dedicate Crow" ] },
+  abysswalker:  { buff: { light: 14, dark: 53 }, debuff: { dark: 20, pdef: 32, mdef: 32 }, buffs: ["Blessing of Ajna", "Incarnation of the Dark" ], debuffs: [ "Nightfall" ] },
+  lightfury:    { buff: { mvspeed: 50, fd: 10, light: 14, dark: 28, patk: 46.8, matk: 46.8, pdef: 75, mdef: 75 }, debuff: { light: 10, patk: 25, matk: 25 }, buffs: [ "Blessing of Ajna", "Chakra Ring", "Chakra Miracle", , "Chakra Heal EX" ], debuffs: ["Sunshine Sparks"] },
+  raven:        { buff: {}, debuff: { dark: 30, pdef: 20, mdef: 20 }, buffs: [ "" ], debuffs: [ "Applause EX","Punishment EX" ] },
+  ripper:       { buff: { fire: 30 }, debuff: { fire: 15, pdef: 20, mdef: 20 }, buffs: [ "Arsonist" ], debuffs: [ "Applause","Punishment", "Blade Runner EX" ] },
 
-  valkyrie:     { buff: { light: 16, patk: 20, matk: 20, mdef: 14, pdef: 14 }, debuff: { light: 16 }, buffs: [ "Scar Maker", "Will Maker" ], debuffs: [ "Arcane Focus" ], variableBuffs: [ "Harmonize" ] },
-  flurry:       { buff: { patk: 20, matk: 20 }, debuff: { resist: 20 }, buffs: [ "Scar Maker", "Will Maker" ], debuffs: [ "Stab Screw EX" ], variableBuffs: [ "Harmonize" ] },
+  valkyrie:     { buff: { light: 16, patk: 20, matk: 20, mdef: 14, pdef: 14 }, debuff: { light: 16 }, buffs: [ "Scar Maker", "Will Maker" ], debuffs: [ "Arcane Focus" ] },
+  flurry:       { buff: { patk: 20, matk: 20 }, debuff: { resist: 20 }, buffs: [ "Scar Maker", "Will Maker" ], debuffs: [ "Stab Screw EX" ] },
 
-  ruina:        { buff: { fd: 30 }, debuff: { light: 30, dark: 30, ice: 30, fire: 30, pdef: 30, mdef: 30 }, buffs: [ "" ], debuffs: [ "Flow Through EX", "Deus Ex Machina" ], variableBuffs: [ "Overhowl" ] },
-  defensio:     { buff: { fd: 30 }, debuff: { pdef: 12, mdef: 12 }, buffs: [ "" ], debuffs: [ "" ], variableBuffs: [ "Overhowl" ]  }
+  ruina:        { buff: { patk: "*", fd: 30 }, debuff: { light: 30, dark: 30, ice: 30, fire: 30, pdef: 30, mdef: 30 }, buffs: [ "" ], debuffs: [ "Flow Through EX", "Deus Ex Machina" ] },
+  defensio:     { buff: { patk: "*", fd: 30 }, debuff: { pdef: 12, mdef: 12 }, buffs: [ "" ], debuffs: [ "" ] }
 };
 
 // O segundo item de cada par é a chave de tradução (window.TRANSLATIONS),
@@ -217,6 +217,7 @@ function computeCompTotals() {
   const buffTotals = {}; COMP_BUFF_FIELDS.forEach(([k]) => buffTotals[k] = 0);
   const buffList = [];
   const debuffList = [];
+  let hasVariablePatk = false;
 
   compSlots.forEach((clsId) => {
     if (!clsId) return;
@@ -230,35 +231,16 @@ function computeCompTotals() {
     COMP_DEBUFF_FIELDS.forEach(([k]) => { debuffTotals[k] += (data.debuff && data.debuff[k]) || 0; });
     COMP_BUFF_FIELDS.forEach(([k]) => {
       const v = data.buff && data.buff[k];
-      // "*" marca um valor variável que não entra na soma — ignorado
-      // silenciosamente, sem nenhuma sinalização visual no total.
-      if (v === "*") return;
+      if (v === "*") { hasVariablePatk = true; return; }
       buffTotals[k] += v || 0;
     });
     if (data.buffs && data.buffs.length) {
-      buffList.push({
-        classId: clsId,
-        name: cls ? getClassName(cls) : clsId,
-        buffs: data.buffs,
-        cd: data.cd || null,
-        // Skills que dão buff pra party mas cujo valor não entra na soma
-        // da composição (situacionais, variáveis, etc.) — aparecem numa
-        // linha separada, abaixo da linha principal de skills da classe.
-        variableBuffs: data.variableBuffs || []
-      });
+      buffList.push({ classId: clsId, name: cls ? getClassName(cls) : clsId, buffs: data.buffs, cd: data.cd || null });
     }
-    debuffList.push({
-      classId: clsId,
-      name: cls ? getClassName(cls) : clsId,
-      debuffs: (data.debuffs || []),
-      // Skills de debuff que a party recebe mas cujo valor não entra na
-      // soma da composição — mostradas inline, depois do último debuff
-      // normal (mesmo padrão do "Buffs Flex").
-      variableDebuffs: data.variableDebuffs || []
-    });
+    debuffList.push({ classId: clsId, name: cls ? getClassName(cls) : clsId, debuffs: (data.debuffs || []) });
   });
 
-  return { debuffTotals, buffTotals, buffList, debuffList };
+  return { debuffTotals, buffTotals, buffList, debuffList, hasVariablePatk };
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -449,14 +431,10 @@ document.addEventListener("DOMContentLoaded", () => {
     wrap.className = "comp-class-buff-skills comp-class-buff-skill-icons";
     const realSkills = (skillNames || []).filter(Boolean);
     if (!realSkills.length) {
-      // Sem emptyText, o campo fica realmente vazio — sem "—" nem
-      // qualquer outra sinalização — quando a classe não tem skill ali.
-      if (emptyText) {
-        const empty = document.createElement("span");
-        empty.textContent = emptyText;
-        if (emptyClass) empty.classList.add(emptyClass);
-        wrap.appendChild(empty);
-      }
+      const empty = document.createElement("span");
+      empty.textContent = emptyText;
+      if (emptyClass) empty.classList.add(emptyClass);
+      wrap.appendChild(empty);
       return wrap;
     }
     realSkills.forEach((skillName) => {
@@ -484,38 +462,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return wrap;
   }
 
-  // Grupo "Flex": skills que dão buff/debuff pra party mas cujo valor não
-  // entra na soma da composição (efeito situacional/variável). Mostrado
-  // na MESMA linha da classe, logo depois do último ícone de skill
-  // normal — classe › buffs (ou debuffs) › Flex › ícones — e só aparece
-  // quando há algo na lista.
-  function appendFlexGroup(textWrap, skillNames, labelKey, labelFallback) {
-    const real = (skillNames || []).filter(Boolean);
-    if (!real.length) return;
-
-    // Seta + rótulo "Flex" + ícones ficam dentro do MESMO sub-container
-    // flex (em vez de 3 itens soltos do textWrap). Isso garante que, se o
-    // textWrap precisar quebrar linha por falta de espaço, o grupo inteiro
-    // quebra junto (nunca a seta/rótulo separados dos ícones), e que os
-    // três fiquem sempre centralizados entre si, independente de quantos
-    // ícones vierem antes deles na linha.
-    const group = document.createElement("span");
-    group.className = "comp-flex-group";
-
-    const arrow = document.createElement("span");
-    arrow.className = "comp-class-buff-arrow";
-    arrow.textContent = "›";
-    group.appendChild(arrow);
-
-    const label = document.createElement("span");
-    label.className = "comp-class-buff-flex-label";
-    label.textContent = i18n(labelKey, labelFallback);
-    group.appendChild(label);
-
-    group.appendChild(buildSkillIconsWrap(real));
-    textWrap.appendChild(group);
-  }
-
   function renderCompStatGrid(container, fields, totals, opts) {
     container.innerHTML = "";
     fields.forEach(([key, labelKey, labelFallback]) => {
@@ -533,6 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
         text = (rounded ? "-" : "") + rounded + "%";
       } else {
         text = (rounded > 0 ? "+" : "") + rounded + "%";
+        if (opts && opts.variable && key === "patk") text += " + *";
       }
       valueEl.textContent = text;
       cell.appendChild(labelEl);
@@ -542,16 +489,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderCompResults() {
-    const { debuffTotals, buffTotals, buffList, debuffList } = computeCompTotals();
+    const { debuffTotals, buffTotals, buffList, debuffList, hasVariablePatk } = computeCompTotals();
     renderCompStatGrid(compDebuffGrid, COMP_DEBUFF_FIELDS, debuffTotals, { isDebuff: true });
-    renderCompStatGrid(compBuffGrid, COMP_BUFF_FIELDS, buffTotals);
+    renderCompStatGrid(compBuffGrid, COMP_BUFF_FIELDS, buffTotals, { variable: hasVariablePatk });
 
     // --- Slide panel: Debuffs exclusivos por classe ---
     // Rótulo classe/skills segue a mesma fonte e layout do rótulo
     // "Classe \"Nickname\"" da coluna de classe da tabela principal
     // (classe em Cinzel/dourado, skills em itálico mais suave).
     compClassDebuffsEl.innerHTML = "";
-    debuffList.forEach(({ classId, name, debuffs, variableDebuffs }) => {
+    debuffList.forEach(({ classId, name, debuffs }) => {
       const row = document.createElement("div");
       row.className = "comp-class-buff-row";
       const img = document.createElement("img");
@@ -565,31 +512,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Nome da classe removido do texto (o ícone da classe já identifica
       // quem é); no lugar, a mesma seta "›" usada no título do painel.
-      // Quando não há debuff normal mas existe Debuffs Flex, essa seta é
-      // omitida — o Flex "toma o espaço" do debuff e vira a única seta da
-      // linha, em vez de mostrar duas setas seguidas (› › Flex).
-      const hasNormalDebuffs = (debuffs || []).some(Boolean);
-      const hasFlexDebuffs = (variableDebuffs || []).some(Boolean);
-      if (hasNormalDebuffs || !hasFlexDebuffs) {
-        const classSpan = document.createElement("span");
-        classSpan.className = "comp-class-buff-arrow";
-        classSpan.textContent = "›";
-        textWrap.appendChild(classSpan);
-      }
+      const classSpan = document.createElement("span");
+      classSpan.className = "comp-class-buff-arrow";
+      classSpan.textContent = "›";
+      textWrap.appendChild(classSpan);
 
-      // Sem skill de debuff, o campo fica vazio (sem "(preencher)" nem
-      // qualquer outra sinalização) — mesmo comportamento dos Buffs.
-      // Só entra na linha se tiver ícone de verdade: um wrap vazio ainda
-      // conta como item pro "gap" do flex, abrindo um espaço extra antes
-      // do grupo Flex nas classes sem debuff normal.
-      if (hasNormalDebuffs) {
-        textWrap.appendChild(buildSkillIconsWrap(debuffs));
-      }
-
-      // "Debuffs Flex": skills de debuff que a party aplica mas cujo
-      // valor não entra na soma — mesma linha, logo após os debuffs
-      // normais (classe › debuffs › Debuffs Flex › ícones).
-      appendFlexGroup(textWrap, variableDebuffs, "compVariableDebuffsLabel", "Flex");
+      const skillsWrap = buildSkillIconsWrap(
+        debuffs,
+        i18n("compEmptyPlaceholder", "(preencher)"),
+        "comp-class-buff-empty"
+      );
+      textWrap.appendChild(skillsWrap);
 
       row.appendChild(textWrap);
       compClassDebuffsEl.appendChild(row);
@@ -597,7 +530,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Slide panel: Buffs exclusivos por classe ---
     compClassBuffsEl.innerHTML = "";
-    buffList.forEach(({ classId, name, buffs, cd, variableBuffs }) => {
+    if (hasVariablePatk) {
+      const note = document.createElement("p");
+      note.className = "comp-variable-note";
+      note.textContent = i18n("compVariableNote", "* ATK Físico com valor variável nessa(s) classe(s) — não incluso na soma.");
+      compClassBuffsEl.appendChild(note);
+    }
+    buffList.forEach(({ classId, name, buffs, cd }) => {
       const row = document.createElement("div");
       row.className = "comp-class-buff-row";
       const img = document.createElement("img");
@@ -611,17 +550,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Nome da classe removido do texto (o ícone da classe já identifica
       // quem é); no lugar, a mesma seta "›" usada no título do painel.
-      // Quando não há buff normal mas existe Buffs Flex, essa seta é
-      // omitida — o Flex "toma o espaço" do buff e vira a única seta da
-      // linha, em vez de mostrar duas setas seguidas (› › Flex).
-      const hasNormalBuffs = (buffs || []).some(Boolean);
-      const hasFlexBuffs = (variableBuffs || []).some(Boolean);
-      if (hasNormalBuffs || !hasFlexBuffs) {
-        const classSpan = document.createElement("span");
-        classSpan.className = "comp-class-buff-arrow";
-        classSpan.textContent = "›";
-        textWrap.appendChild(classSpan);
-      }
+      const classSpan = document.createElement("span");
+      classSpan.className = "comp-class-buff-arrow";
+      classSpan.textContent = "›";
+      textWrap.appendChild(classSpan);
 
       // Skills: em vez do nome em texto, mostra o ícone da skill
       // (img/skill/icones/<slug>_icone.png). Passar o cursor por cima
@@ -631,27 +563,14 @@ document.addEventListener("DOMContentLoaded", () => {
       // ícones de boss da Rotação Diária). Skills "EX" mostram aqui
       // apenas o icone_1 (<baseSlug>_icone_1.png) — o icone_2 só aparece
       // no tooltip, sobreposto na 2ª imagem de descrição.
-      // Se a classe não tem skill de buff, o campo fica vazio (sem "—"
-      // nem qualquer outra sinalização).
-      const skillsWrap = buildSkillIconsWrap(buffs);
+      const skillsWrap = buildSkillIconsWrap(buffs, "—");
       if (cd) {
         const cdSpan = document.createElement("span");
         cdSpan.className = "comp-skill-cd";
         cdSpan.textContent = `CD: -${cd}%`;
         skillsWrap.appendChild(cdSpan);
       }
-      // Só entra na linha se tiver conteúdo (ícone e/ou CD): um wrap vazio
-      // ainda conta como item pro "gap" do flex, abrindo um espaço extra
-      // antes do grupo Flex nas classes sem buff normal.
-      if (skillsWrap.children.length) {
-        textWrap.appendChild(skillsWrap);
-      }
-
-      // "Buffs Flex": skills que dão buff pra party mas cujo valor NÃO
-      // entra na soma da composição (efeito situacional/variável) —
-      // mesma linha, logo após os buffs normais (classe › buffs ›
-      // Buffs Flex › ícones).
-      appendFlexGroup(textWrap, variableBuffs, "compVariableBuffsLabel", "Flex");
+      textWrap.appendChild(skillsWrap);
 
       row.appendChild(textWrap);
       compClassBuffsEl.appendChild(row);
