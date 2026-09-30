@@ -1284,8 +1284,27 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Backup - Import
-  importBtn.addEventListener("click", (e) => {
+  // Com a File System Access API (Chrome/Edge) o arquivo é aberto por um handle: assim o Auto-save passa a
+  // gravar NESSE mesmo arquivo importado a cada mudança. Sem a API (ou se falhar), cai no input de arquivo.
+  importBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
+    if (typeof window.showOpenFilePicker === "function") {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          multiple: false,
+          types: [{ description: "Dragon Nest Backup", accept: { "application/json": [".json"] } }]
+        });
+        const file = await handle.getFile();
+        // Libera a escrita já agora (ainda dentro do gesto do clique); se o navegador negar, o Auto-save pede depois.
+        try { await handle.requestPermission({ mode: "readwrite" }); } catch (_) { /* pedido de novo no próximo clique */ }
+        window.dispatchEvent(new CustomEvent("dn:import-handle", { detail: { handle, name: file.name } }));
+        importData(file);
+        return;
+      } catch (err) {
+        if (err && err.name === "AbortError") return;   // cancelou o seletor
+        // qualquer outro erro: usa o método antigo abaixo
+      }
+    }
     importFileInput.click();
   });
 
@@ -5229,6 +5248,23 @@ document.addEventListener("DOMContentLoaded", () => {
     attributes: true,
     characterData: true,
     attributeFilter: ["class", "data-gear", "data-account", "data-nickname", "data-class-id"]
+  });
+
+  // O arquivo importado vira o destino do Auto-save (um único arquivo: o que você importou).
+  window.addEventListener("dn:import-handle", async (ev) => {
+    const d = ev.detail || {};
+    if (!d.handle) return;
+    fileHandle = d.handle;
+    await saveHandleToDB(d.handle);
+    lastSavedHash = null;
+    needsReconnect = autoSaveEnabled && !(await hasPermission(d.handle));
+    updateBtnState();
+    if (window.showToast) {
+      window.showToast(autoSaveEnabled
+        ? "Auto-save vinculado ao arquivo importado: " + (d.name || "")
+        : "Arquivo importado: ao ligar o Auto, ele será atualizado automaticamente");
+    }
+    if (autoSaveEnabled) scheduleAutoSave();
   });
 
   // Reconexão: qualquer clique (gesto do usuário) pede a permissão de volta e grava o que ficou pendente.
