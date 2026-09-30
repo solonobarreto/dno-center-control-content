@@ -3416,14 +3416,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Marca o conteúdo como feito no personagem (classe + nickname) da tabela. Devolve o rótulo do
   // conteúdo (no idioma atual) se o personagem e o chip existem, ou null.
-  function markContentDone(classId, nickname, title) {
+  function markContentDone(classId, nickname, title, strict) {
     const rows = Array.from(document.querySelectorAll("#tablesWrapper tbody tr")).filter((r) => r.dataset.classId === classId);
     if (!rows.length) return null;
     let row = rows.find((r) => {
       const el = r.querySelector(".class-nickname");
       return el && (el.dataset.nickname || "") === nickname;
     });
-    if (!row && rows.length === 1) row = rows[0];
+    // strict = usado pelo líder na própria tela: só marca se classe + nickname baterem (não chuta)
+    if (!row && !strict && rows.length === 1) row = rows[0];
     if (!row) return null;
     const chip = Array.from(row.querySelectorAll(".content-chip")).find((c) => c.dataset.title === title);
     if (!chip) return null;
@@ -3434,6 +3435,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const lab = chip.querySelector(".chip-label");
     return (lab && lab.textContent) || title;
   }
+
+  // O Criador de Grupos (outro bloco) usa isto para marcar o conteúdo na tabela do próprio líder.
+  window.dnMarkContentDone = (classId, nickname, title) => markContentDone(String(classId || ""), String(nickname || ""), String(title || ""), true);
 
   function showNoticeCard(text) {
     const card = document.createElement("div");
@@ -5500,17 +5504,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (slotClass && st.ig > 0) return null;
       return { guest: false, gtype: null };
     }
-    // Fora do elemento:
-    // (a) healer: só se nenhum healer do elemento existe nos arquivos (prioridade do healer do elemento)
-    if (AP_HEALERS.includes(c.classId) && !ctx.nativeHealer[E] && st.fh < 1) return { guest: true, gtype: "healer" };
-    // (b) convidado Ice (Glaciana/Saint) ocupando a única vaga de suporte
-    if (AP_ICE_GUESTS.includes(c.classId) && E !== "ice" && st.ig < 1 && st.slotCount < 1) return { guest: true, gtype: "ice" };
-    // (c) suporte/cooldown de outro elemento completando a party
-    if (AP_FOREIGN_OK.includes(c.classId) && !AP_HEALERS.includes(c.classId) && !(slotClass && st.ig > 0)) return { guest: true, gtype: "support" };
-    // (d) sub-healer de outro elemento, apenas quando não há healer nenhum nos arquivos
-    if (AP_SUBHEALERS.includes(c.classId) && !ctx.trueHealer) return { guest: true, gtype: "support" };
-    // (e) modo relaxado: nenhuma party válida existe → aceita qualquer classe, com penalidade
-    if (relax) return { guest: true, gtype: "off" };
+    // Fora do elemento: NUNCA. A party é sempre do elemento escolhido ou neutro (ex.: Dark não entra em party Fire).
     return null;
   }
 
@@ -5561,7 +5555,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function apBuildBestParty(files, N, exclude) {
     const ctx = apContext(files);
     let best = null;
-    [[false, true], [false, false], [true, false]].forEach(([relax, capOn]) => {
+    // Sem passada "relaxada": classe de outro elemento nunca entra. Só se afrouxa o teto de carries.
+    [[false, true], [false, false]].forEach(([relax, capOn]) => {
       if (best) return;
       AP_ELEMENT_KEYS.forEach((E) => {
         const plan = apPlanForElement(files, N, E, ctx, relax, capOn, exclude);
@@ -5821,7 +5816,6 @@ document.addEventListener("DOMContentLoaded", () => {
         clr.textContent = "✕";
         clr.title = T("apClearSlot", "Remover");
         clr.addEventListener("click", () => {
-          if (dirty.has(i) && !confirm(T("apResetConfirm", "Há arquivos atualizados que ainda não foram baixados. Limpar mesmo assim?"))) return;
           slots[i] = null; dirty.delete(i);
           rejected.clear(); clearResult(); updateDl(); renderFiles(); renderOnline();
         });
@@ -5840,36 +5834,8 @@ document.addEventListener("DOMContentLoaded", () => {
     return p;
   }
 
-  // ---------------------------------------------------------------- baixar arquivos atualizados
-  const dlBtn = document.createElement("button");
-  dlBtn.type = "button";
-  dlBtn.className = "side-menu-item hidden";
-  genBtn.parentElement.appendChild(dlBtn);
-
-  function updateDl() {
-    dlBtn.classList.toggle("hidden", dirty.size === 0);
-    dlBtn.textContent = "⭳ " + T("apDownload", "Baixar arquivos atualizados") + " (" + dirty.size + ")";
-  }
-  dlBtn.addEventListener("click", () => {
-    Array.from(dirty).forEach((i, n) => {
-      const s = slots[i];
-      if (!s) return;
-      setTimeout(() => {
-        const blob = new Blob([JSON.stringify(s.data, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = s.name.replace(/\.json$/i, "") + "-atualizado.json";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-      }, n * 300);
-    });
-    dirty.clear();
-    updateDl();
-    renderFiles();
-  });
+  // Sem botão de download: a marcação de concluído vai direto para a tabela do líder e, online, para a dos convidados.
+  function updateDl() { /* mantido só para não quebrar as chamadas existentes */ }
 
   // ---------------------------------------------------------------- gerar
   function generate() {
@@ -5937,6 +5903,11 @@ document.addEventListener("DOMContentLoaded", () => {
         e.done = true;
         s.data.savedAt = Date.now();   // evita que o reset semanal do import "desfaça" a marcação
         concluded.add(concludedKey(s, chr, content));
+        // Tabela do próprio líder (coluna de conteúdo): marca o mesmo personagem como concluído.
+        // Só arquivos locais; quem veio por convite online é atualizado na tela dele pelo aviso do servidor.
+        if (!(s.source && s.source.pub) && typeof window.dnMarkContentDone === "function") {
+          try { window.dnMarkContentDone(chr.classId, chr.nickname, content); } catch (_) { /* tabela indisponível */ }
+        }
         if (s.source && s.source.pub) {
           // arquivo vindo do convite online: atualizado online, sem baixar
           const o = online.get(s.source.pub) || { slot: s, chars: [] };
@@ -5960,11 +5931,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const row = resultEl.querySelector(".ap-done-row");
     if (row) {
       row.textContent = "";
-      if (dirty.size || !online.size) {
-        row.appendChild(note("✔ " + T("apDoneMsg", "Conteúdo concluído nos arquivos. Gere uma nova party com os personagens restantes ou baixe os arquivos atualizados.")));
-      } else {
-        row.appendChild(note("✔ " + T("apDoneMsgOnline", "Conteúdo concluído. Gere uma nova party com os personagens restantes.")));
-      }
+      row.appendChild(note("✔ " + T("apDoneMsgOnline", "Conteúdo concluído. Gere uma nova party com os personagens restantes.")));
       const failNote = () => note("⚠️ " + T("apSyncFail", "Não foi possível avisar {names} online. Convide a pessoa de novo e conclua o conteúdo outra vez."), "warn");
       if (online.size) {
         const pending = note("⏳ " + T("apSyncing", "Atualizando online os dados dos jogadores convidados…"));
@@ -6313,7 +6280,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (inviteCloseBtn) inviteCloseBtn.addEventListener("click", () => closeInvitePanel());
   if (inviteBackdrop) inviteBackdrop.addEventListener("click", () => closeInvitePanel());
   resetBtn.addEventListener("click", () => {
-    if (dirty.size && !confirm(T("apResetConfirm", "Há arquivos atualizados que ainda não foram baixados. Limpar mesmo assim?"))) return;
     cancelAllInvites(); invites.clear(); onlineMsg("");
     slots.fill(null); dirty.clear(); contentTitle = ""; rejected.clear(); clearResult(); renderAll();
   });
