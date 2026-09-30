@@ -3269,6 +3269,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // -------------------------------------------------------
   const SHARE_URL = "/api/party-share";
   let onlineUsers = [];      // [{ pub, name, classId }] — sem a própria pessoa
+  let onlineTotal = 0;       // total de sessões online segundo o servidor (inclui quem não tem classe na tabela)
   let presenceLive = false;  // true = a function de presença respondeu no último heartbeat
   let apiMissing = false;    // true = servidor sem as Functions (404/405), ex.: servidor estático simples
   let hbCount = 0;
@@ -3279,7 +3280,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const row = document.querySelector("#tablesWrapper tbody tr");
       if (!row) return null;
       const el = row.querySelector(".class-nickname");
-      const name = ((el && (el.dataset.nickname || el.textContent)) || "").trim();
+      const clsEl = el && el.querySelector(".class-nickname-class");
+      const name = ((el && (el.dataset.nickname || (clsEl && clsEl.textContent))) || "").trim();
       const classId = row.dataset.classId || (el && el.dataset.classId) || "";
       return name ? { name: name.slice(0, 30), classId } : null;
     } catch (_) {
@@ -3405,6 +3407,86 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // -------------------------------------------------------
+  // Conteúdo concluído pelo líder da party: o servidor entrega o aviso no heartbeat. Aqui o
+  // conteúdo é marcado como feito nos personagens indicados (mesmo clique do chip) e a pessoa
+  // recebe uma mensagem dizendo que o líder finalizou o conteúdo.
+  // -------------------------------------------------------
+  const appliedNotices = new Set();
+
+  // Marca o conteúdo como feito no personagem (classe + nickname) da tabela. Devolve o rótulo do
+  // conteúdo (no idioma atual) se o personagem e o chip existem, ou null.
+  function markContentDone(classId, nickname, title) {
+    const rows = Array.from(document.querySelectorAll("#tablesWrapper tbody tr")).filter((r) => r.dataset.classId === classId);
+    if (!rows.length) return null;
+    let row = rows.find((r) => {
+      const el = r.querySelector(".class-nickname");
+      return el && (el.dataset.nickname || "") === nickname;
+    });
+    if (!row && rows.length === 1) row = rows[0];
+    if (!row) return null;
+    const chip = Array.from(row.querySelectorAll(".content-chip")).find((c) => c.dataset.title === title);
+    if (!chip) return null;
+    if (!chip.classList.contains("done")) {
+      const st = chip.querySelector(".chip-status");
+      if (st) st.click();   // mesmo caminho do clique do usuário (ícone, Duel Dragon vinculado, etc.)
+    }
+    const lab = chip.querySelector(".chip-label");
+    return (lab && lab.textContent) || title;
+  }
+
+  function showNoticeCard(text) {
+    const card = document.createElement("div");
+    card.className = "invite-card";
+    card.setAttribute("role", "alertdialog");
+    const head = document.createElement("div");
+    head.className = "invite-head";
+    const text_ = document.createElement("div");
+    text_.className = "invite-text";
+    text_.textContent = text;
+    head.appendChild(text_);
+    const actions = document.createElement("div");
+    actions.className = "invite-actions";
+    const ok = document.createElement("button");
+    ok.type = "button";
+    ok.className = "invite-btn accept";
+    ok.textContent = i18n("apOk", "OK");
+    ok.addEventListener("click", () => card.remove());
+    actions.appendChild(ok);
+    card.appendChild(head);
+    card.appendChild(actions);
+    ensureInviteHost().appendChild(card);
+  }
+
+  function handleIncomingNotices(list) {
+    list.forEach((n) => {
+      if (!n || !n.noticeId || appliedNotices.has(n.noticeId)) return;
+      appliedNotices.add(n.noticeId);
+      const done = [];
+      let label = "";
+      (Array.isArray(n.chars) ? n.chars : []).forEach((c) => {
+        const lab = markContentDone(String(c.classId || ""), String(c.nickname || ""), String(n.content || ""));
+        if (lab) { label = lab; done.push(c.nickname || c.classId); }
+      });
+      // confirma o recebimento (o servidor apaga o aviso); se falhar, o aviso volta e é ignorado pelo Set
+      fetch(SHARE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ack", id: SESSION_ID, noticeId: n.noticeId })
+      }).catch(() => {});
+      const leader = n.fromName || "?";
+      const what = label || n.content || "";
+      const who = done.length ? done.map((x) => "\"" + x + "\"").join(", ") : "";
+      showNoticeCard(
+        who
+          ? i18n("apLeaderDone", "👑 {leader}, líder da party, finalizou o conteúdo {content}. Marcado como concluído em: {chars}.")
+              .replace("{leader}", leader).replace("{content}", what).replace("{chars}", who)
+          : i18n("apLeaderDoneNoChar", "👑 {leader}, líder da party, finalizou o conteúdo {content}.")
+              .replace("{leader}", leader).replace("{content}", what)
+      );
+    });
+  }
+
   async function heartbeat() {
     touchOwnTab();
     // Sem Functions (file:// ou servidor estático): não chama a API (ou chama só de vez em quando, para o caso de
@@ -3439,7 +3521,9 @@ document.addEventListener("DOMContentLoaded", () => {
       lastCountries = (data.countries && typeof data.countries === "object") ? data.countries : null;
       presenceLive = true;
       onlineUsers = Array.isArray(data.users) ? data.users.filter((u) => u && u.pub && u.name) : [];
+      onlineTotal = data.count;
       handleIncomingInvites(Array.isArray(data.invites) ? data.invites : []);
+      handleIncomingNotices(Array.isArray(data.notices) ? data.notices : []);
     } catch (_) {
       showOnline(localCount());
       lastRegions = null;
@@ -3454,6 +3538,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.VISITOR_REGION = VISITOR_REGION;
   window.VISITOR_COUNTRY = VISITOR_COUNTRY;
   window.getOnlineUsers = () => onlineUsers;
+  window.getOnlineTotal = () => onlineTotal;
   window.isPresenceLive = () => presenceLive;
   window.dnDeviceId = DEVICE_ID; // usado pelo Criador de Grupos para convidar/receber
 
@@ -5701,7 +5786,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (slots[i]) {
         info.textContent = slots[i].name + " · " + slots[i].data.characters.length + " " + T("apChars", "personagens")
           + (slots[i].source ? " · " + T("apViaOnline", "online") : "")
-          + (dirty.has(i) ? " · " + T("apFileUpdated", "atualizado") : "");
+          + (dirty.has(i) ? " · " + T("apFileUpdated", "atualizado") : "")
+          + (slots[i].synced ? " · " + T("apSyncedOnline", "atualizado online") : "");
       }
       const input = document.createElement("input");
       input.type = "file";
@@ -5822,9 +5908,27 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ---------------------------------------------------------------- concluir conteúdo
+  // Avisa online quem foi importado pelo convite: o arquivo dessa pessoa NÃO é baixado — o servidor
+  // entrega o aviso no heartbeat dela e o conteúdo é marcado como concluído na tabela dela.
+  async function notifyOnlineDone(pub, slot, content, chars) {
+    try {
+      const res = await fetch(SHARE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete", id: window.dnDeviceId, to: pub, content, chars })
+      });
+      if (!res.ok) throw new Error("complete " + res.status);
+      slot.synced = true;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function concludeCurrent() {
     if (!lastPlan || lastPlan.concluded) return;
     const { plan, content, size } = lastPlan;
+    const online = new Map();   // pub -> { slot, chars: [{ classId, nickname }] }
     plan.members.forEach((m) => {
       const s = slots[m.file];
       const chr = s && s.data.characters[m.idx];
@@ -5833,7 +5937,14 @@ document.addEventListener("DOMContentLoaded", () => {
         e.done = true;
         s.data.savedAt = Date.now();   // evita que o reset semanal do import "desfaça" a marcação
         concluded.add(concludedKey(s, chr, content));
-        dirty.add(m.file);
+        if (s.source && s.source.pub) {
+          // arquivo vindo do convite online: atualizado online, sem baixar
+          const o = online.get(s.source.pub) || { slot: s, chars: [] };
+          o.chars.push({ classId: chr.classId || "", nickname: chr.nickname || "" });
+          online.set(s.source.pub, o);
+        } else {
+          dirty.add(m.file);
+        }
       }
     });
     lastPlan.concluded = true;
@@ -5849,7 +5960,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const row = resultEl.querySelector(".ap-done-row");
     if (row) {
       row.textContent = "";
-      row.appendChild(note("✔ " + T("apDoneMsg", "Conteúdo concluído nos arquivos. Gere uma nova party com os personagens restantes ou baixe os arquivos atualizados.")));
+      if (dirty.size || !online.size) {
+        row.appendChild(note("✔ " + T("apDoneMsg", "Conteúdo concluído nos arquivos. Gere uma nova party com os personagens restantes ou baixe os arquivos atualizados.")));
+      } else {
+        row.appendChild(note("✔ " + T("apDoneMsgOnline", "Conteúdo concluído. Gere uma nova party com os personagens restantes.")));
+      }
+      const failNote = () => note("⚠️ " + T("apSyncFail", "Não foi possível avisar {names} online. Convide a pessoa de novo e conclua o conteúdo outra vez."), "warn");
+      if (online.size) {
+        const pending = note("⏳ " + T("apSyncing", "Atualizando online os dados dos jogadores convidados…"));
+        row.appendChild(pending);
+        Promise.all(Array.from(online.entries()).map(async ([pub, o]) => ({ o, ok: await notifyOnlineDone(pub, o.slot, content, o.chars) }))).then((results) => {
+          pending.remove();
+          const failed = results.filter((r) => !r.ok).map((r) => r.o.slot.name);
+          if (failed.length) {
+            const n = failNote();
+            n.textContent = n.textContent.replace("{names}", failed.join(", "));
+            row.appendChild(n);
+          } else {
+            row.appendChild(note("📤 " + T("apSyncedMsg", "Os jogadores convidados foram avisados: o líder finalizou o conteúdo e o arquivo deles foi atualizado online.")));
+          }
+          renderFiles();
+        });
+      }
     }
   }
 
@@ -6022,7 +6154,13 @@ document.addEventListener("DOMContentLoaded", () => {
       onlineListEl.appendChild(note(localMode
         ? T("apOnlineLocal", "Modo local: os convites só funcionam no site publicado ou com \"netlify dev\".")
         : T("apOnlineOffline", "Convites indisponíveis: não foi possível falar com o servidor."))); return; }
-    if (!users.length) { onlineListEl.appendChild(note(T("apOnlineEmpty", "Ninguém online com personagens no momento."))); return; }
+    if (!users.length) {
+      const total = typeof window.getOnlineTotal === "function" ? window.getOnlineTotal() : 0;
+      const others = Math.max(0, total - 1);   // o total inclui a própria pessoa
+      onlineListEl.appendChild(note(T("apOnlineEmpty", "Ninguém online com personagens no momento.")
+        + (others > 0 ? " (" + others + " " + T("apOnlineNoChars", "online sem classe na tabela ou com versão antiga do site") + ")" : "")));
+      return;
+    }
 
     users.forEach((u) => {
       const st = invites.get(u.pub);

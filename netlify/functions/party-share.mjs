@@ -12,6 +12,10 @@ import { createHash, randomUUID } from "node:crypto";
 //   3. Se aceitar, o alvo manda  POST {action:"respond", id, reqId, accept:true, data}.
 //   4. O HOST faz polling  GET ?req=..&to=..&id=..  e recebe o JSON uma única vez
 //      (o servidor apaga o dado logo depois de entregar).
+//   5. Conteúdo concluído: o HOST manda  POST {action:"complete", id, to, content, chars}.
+//      Só funciona para quem aceitou um convite dele ("grant" g:<alvo>:<host>). O servidor
+//      cria um aviso n:<alvo>:<id> que o alvo recebe no heartbeat (/api/presence devolve
+//      "notices"), aplica na própria tabela e confirma com  POST {action:"ack"}.
 //
 // Identificação: o navegador de cada pessoa tem um id privado (localStorage).
 // Ele NUNCA é exposto: para os outros usuários só aparece o "pub" (hash curto
@@ -20,6 +24,8 @@ import { createHash, randomUUID } from "node:crypto";
 
 // --- Mantenha estes helpers idênticos aos de presence.mjs -------------------
 const INVITE_TTL_MS = 120000; // um convite vale 2 min
+const NOTICE_TTL_MS = 3600000; // aviso de conteúdo concluído vale 1 h (o alvo está online: chega em segundos)
+const GRANT_TTL_MS = 21600000; // quem aceitou um convite pode receber avisos do líder por 6 h
 const pubOf = (id) =>
   createHash("sha256").update("dn-origins-presence:" + id).digest("hex").slice(0, 20);
 const cleanId = (id) =>
@@ -29,6 +35,8 @@ const cleanId = (id) =>
 const MAX_BODY_BYTES = 2000000;   // ~2 MB (um backup normal tem dezenas de KB)
 const MAX_CHARACTERS = 300;
 const MAX_PENDING_PER_TARGET = 5; // evita spam de convites para uma pessoa só
+const MAX_NOTICES_PER_TARGET = 20;
+const MAX_NOTICE_CHARS = 20;
 const PUB_RE = /^[a-f0-9]{20}$/;
 const REQ_RE = /^[a-z0-9]{6,12}-[a-f0-9-]{36}$/;
 
@@ -56,6 +64,16 @@ async function sweep(store, now) {
     const { blobs } = await store.list();
     await Promise.all(
       blobs.map(async ({ key }) => {
+        if (key.startsWith("n:")) {   // aviso de conteúdo concluído
+          const ts = reqTs(key.split(":")[2]);
+          if (!ts || now - ts > NOTICE_TTL_MS) await store.delete(key);
+          return;
+        }
+        if (key.startsWith("g:")) {   // permissão dada ao aceitar um convite
+          const g = await readJson(store, key);
+          if (!g || !g.ts || now - Number(g.ts) > GRANT_TTL_MS) await store.delete(key);
+          return;
+        }
         const reqId = key.startsWith("r:") ? key.split(":")[2] : key.startsWith("d:") ? key.slice(2) : "";
         if (reqId && isExpired(reqId, now)) await store.delete(key);
       })
@@ -123,11 +141,50 @@ async function handleRespond(body, store, now) {
     }
     // Primeiro o dado, depois o status: o host nunca vê "accepted" sem dado.
     await store.set(`d:${reqId}`, JSON.stringify(data));
+    // Quem aceitou passa a poder receber o aviso de "conteúdo concluído" deste líder (e só dele).
+    await store.set(`g:${pubOf(id)}:${rec.fromPub}`, JSON.stringify({ ts: now }));
     rec.status = "accepted";
   } else {
     rec.status = "declined";
   }
   await store.set(key, JSON.stringify(rec));
+  return json({ ok: true });
+}
+
+async function handleComplete(body, store, presence, now) {
+  const id = cleanId(body.id);
+  const to = String(body.to || "");
+  const content = typeof body.content === "string" ? body.content.slice(0, 120) : "";
+  if (!id || !PUB_RE.test(to) || !content || !Array.isArray(body.chars)) return json({ error: "bad_request" }, 400);
+
+  const chars = body.chars.slice(0, MAX_NOTICE_CHARS).map((c) => ({
+    classId: typeof c?.classId === "string" ? c.classId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) : "",
+    nickname: typeof c?.nickname === "string" ? c.nickname.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 60) : ""
+  })).filter((c) => c.classId);
+  if (!chars.length) return json({ error: "bad_request" }, 400);
+
+  // Só quem aceitou um convite deste líder recebe o aviso.
+  const fromPub = pubOf(id);
+  const grant = await readJson(store, `g:${to}:${fromPub}`);
+  if (!grant || !grant.ts || now - Number(grant.ts) > GRANT_TTL_MS) return json({ error: "no_grant" }, 403);
+
+  const me = await readJson(presence, id);
+  const fromName = me && me.name ? String(me.name).slice(0, 30) : "";
+
+  const prefix = `n:${to}:`;
+  const { blobs } = await store.list({ prefix });
+  if (blobs.length >= MAX_NOTICES_PER_TARGET) return json({ error: "busy" }, 429);
+
+  const noticeId = `${now.toString(36)}-${randomUUID()}`;
+  await store.set(`${prefix}${noticeId}`, JSON.stringify({ fromPub, fromName, content, chars }));
+  return json({ ok: true });
+}
+
+async function handleAck(body, store) {
+  const id = cleanId(body.id);
+  const noticeId = String(body.noticeId || "");
+  if (!id || !REQ_RE.test(noticeId)) return json({ error: "bad_request" }, 400);
+  await store.delete(`n:${pubOf(id)}:${noticeId}`);   // a chave leva o pub de quem confirma: só o destinatário apaga
   return json({ ok: true });
 }
 
@@ -204,6 +261,11 @@ export default async (req) => {
     }
     case "respond": return handleRespond(body, store, now);
     case "cancel":  return handleCancel(body, store);
+    case "complete": {
+      const presence = getStore({ name: "presence", consistency: "strong" });
+      return handleComplete(body, store, presence, now);
+    }
+    case "ack":     return handleAck(body, store);
     default:        return json({ error: "unknown_action" }, 400);
   }
 };

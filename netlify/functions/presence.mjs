@@ -73,6 +73,7 @@ function todayKey(now) {
 // --- Convites do Grupo Automático -------------------------------------------
 // Mantenha estes helpers idênticos aos de party-share.mjs.
 const INVITE_TTL_MS = 120000;
+const NOTICE_TTL_MS = 3600000;   // igual ao de party-share.mjs
 const pubOf = (id) =>
   createHash("sha256").update("dn-origins-presence:" + id).digest("hex").slice(0, 20);
 
@@ -105,6 +106,28 @@ async function readInbox(pub, now) {
       try { rec = JSON.parse((await store.get(key)) || "null"); } catch (_) { rec = null; }
       if (rec && rec.status === "pending") {
         out.push({ reqId, fromName: rec.fromName || "", fromClassId: rec.fromClassId || "", ts });
+      }
+    })
+  );
+  return out.sort((a, b) => a.ts - b.ts);
+}
+
+// Avisos de "conteúdo concluído" enviados pelo líder da party (party-share.mjs, action "complete").
+// Ficam na caixa de entrada até o destinatário confirmar (action "ack") ou vencerem.
+async function readNotices(pub, now) {
+  const store = getStore({ name: "party-invites", consistency: "strong" });
+  const prefix = `n:${pub}:`;
+  const { blobs } = await store.list({ prefix });
+  const out = [];
+  await Promise.all(
+    blobs.map(async ({ key }) => {
+      const noticeId = key.slice(prefix.length);
+      const ts = parseInt(noticeId.split("-")[0], 36) || 0;
+      if (!ts || now - ts > NOTICE_TTL_MS) { await store.delete(key); return; }
+      let rec = null;
+      try { rec = JSON.parse((await store.get(key)) || "null"); } catch (_) { rec = null; }
+      if (rec && Array.isArray(rec.chars)) {
+        out.push({ noticeId, fromName: rec.fromName || "", content: rec.content || "", chars: rec.chars, ts });
       }
     })
   );
@@ -218,8 +241,10 @@ export default async (req, context) => {
         .slice(0, 100)
     : [];
   let invites = [];
+  let notices = [];
   if (myPub) {
     try { invites = await readInbox(myPub, now); } catch (_) { invites = []; } // nunca derruba o heartbeat
+    try { notices = await readNotices(myPub, now); } catch (_) { notices = []; }
   }
 
   // Estatísticas globais: acessos totais (todos os visitantes, desde sempre),
@@ -261,6 +286,7 @@ export default async (req, context) => {
     countries: countryCounts,
     users,
     invites,
+    notices,
     stats: { total, dailyAverage, regions: totalRegionCounts, countries: totalCountryCounts }
   }), {
     headers: { "content-type": "application/json", "cache-control": "no-store" }

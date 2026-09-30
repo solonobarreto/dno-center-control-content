@@ -3733,7 +3733,8 @@ th.col-content .content-face {
 
 /* Aviso de convite recebido (aparece em qualquer tela do app, acima dos modais) */
 .invite-host {
-  position: fixed; right: 18px; bottom: 18px; z-index: 30000;
+  /* bottom maior: o selo "Powered by Netlify" (canto inferior direito) ficava por cima do aviso */
+  position: fixed; right: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); z-index: 30000;
   display: flex; flex-direction: column; gap: 10px;
   width: 340px; max-width: calc(100vw - 36px);
 }
