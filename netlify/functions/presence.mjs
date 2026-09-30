@@ -1,4 +1,5 @@
 import { getStore } from "@netlify/blobs";
+import { createHash } from "node:crypto";
 
 // Uma sessão é considerada "online" se mandou heartbeat nos últimos 25s.
 const STALE_MS = 25000;
@@ -69,6 +70,48 @@ function todayKey(now) {
   return new Date(now).toISOString().slice(0, 10);
 }
 
+// --- Convites do Grupo Automático -------------------------------------------
+// Mantenha estes helpers idênticos aos de party-share.mjs.
+const INVITE_TTL_MS = 120000;
+const pubOf = (id) =>
+  createHash("sha256").update("dn-origins-presence:" + id).digest("hex").slice(0, 20);
+
+// Nome exibido para os outros = nickname da 1ª classe da tabela do usuário
+// (enviado pelo front-end no heartbeat). Só tira caracteres de controle e limita o tamanho.
+function sanitizeName(name) {
+  if (typeof name !== "string") return "";
+  return name.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 30);
+}
+function sanitizeClassId(classId) {
+  return typeof classId === "string" && /^[A-Za-z0-9_-]{1,32}$/.test(classId) ? classId : "";
+}
+
+// Convites pendentes endereçados a este usuário (entregues no próprio heartbeat).
+async function readInbox(pub, now) {
+  const store = getStore({ name: "party-invites", consistency: "strong" });
+  const prefix = `r:${pub}:`;
+  const { blobs } = await store.list({ prefix });
+  const out = [];
+  await Promise.all(
+    blobs.map(async ({ key }) => {
+      const reqId = key.slice(prefix.length);
+      const ts = parseInt(reqId.split("-")[0], 36) || 0;
+      if (!ts || now - ts > INVITE_TTL_MS) {
+        await store.delete(key);
+        await store.delete(`d:${reqId}`);
+        return;
+      }
+      let rec = null;
+      try { rec = JSON.parse((await store.get(key)) || "null"); } catch (_) { rec = null; }
+      if (rec && rec.status === "pending") {
+        out.push({ reqId, fromName: rec.fromName || "", fromClassId: rec.fromClassId || "", ts });
+      }
+    })
+  );
+  return out.sort((a, b) => a.ts - b.ts);
+}
+// -----------------------------------------------------------------------------
+
 export default async (req, context) => {
   const presenceStore = getStore({ name: "presence", consistency: "strong" });
   const statsStore = getStore({ name: "presence-stats", consistency: "strong" });
@@ -92,7 +135,12 @@ export default async (req, context) => {
     if (body.leave) {
       await presenceStore.delete(id);
     } else {
-      await presenceStore.set(id, JSON.stringify({ ts: now, region, country }));
+      await presenceStore.set(id, JSON.stringify({
+        ts: now, region, country,
+        name: sanitizeName(body.name),
+        classId: sanitizeClassId(body.classId),
+        pub: pubOf(id)
+      }));
 
       // Acessos totais + média diária + região/país: conta no máximo 1 acesso
       // por dispositivo por dia (dedupe via chave própria), então soma de
@@ -130,6 +178,7 @@ export default async (req, context) => {
   const regionCounts = {};
   const countryCounts = {}; // { region: { countryCode: count } }
   let aliveCount = 0;
+  const onlineUsers = []; // { pub, name, classId } — só quem tem personagem na tabela
 
   await Promise.all(
     blobs.map(async ({ key }) => {
@@ -148,6 +197,9 @@ export default async (req, context) => {
         return;
       }
       aliveCount++;
+      if (isObj && raw.pub && raw.name) {
+        onlineUsers.push({ pub: raw.pub, name: raw.name, classId: raw.classId || "" });
+      }
       regionCounts[region] = (regionCounts[region] || 0) + 1;
       countryCounts[region] = countryCounts[region] || {};
       countryCounts[region][country] = (countryCounts[region][country] || 0) + 1;
@@ -155,6 +207,20 @@ export default async (req, context) => {
   );
 
   const count = Math.max(1, aliveCount);
+
+  // Lista de online + caixa de convites só vão para quem mandou o heartbeat
+  // (POST com id). O GET anônimo do painel de regiões não recebe nomes.
+  const myPub = id && !body.leave ? pubOf(id) : "";
+  const users = myPub
+    ? onlineUsers
+        .filter((u) => u.pub !== myPub)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(0, 100)
+    : [];
+  let invites = [];
+  if (myPub) {
+    try { invites = await readInbox(myPub, now); } catch (_) { invites = []; } // nunca derruba o heartbeat
+  }
 
   // Estatísticas globais: acessos totais (todos os visitantes, desde sempre),
   // a média diária a partir de quantos dias distintos já tiveram acesso, e o
@@ -193,6 +259,8 @@ export default async (req, context) => {
     count,
     regions: regionCounts,
     countries: countryCounts,
+    users,
+    invites,
     stats: { total, dailyAverage, regions: totalRegionCounts, countries: totalCountryCounts }
   }), {
     headers: { "content-type": "application/json", "cache-control": "no-store" }

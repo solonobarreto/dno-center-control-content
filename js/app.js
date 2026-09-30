@@ -764,7 +764,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Exposto para que a troca de idioma (index.html / listener de .lang-item)
-  // possa re-renderizar os rótulos dinâmicos do Criador de Composição
+  // possa re-renderizar os rótulos dinâmicos do Criador de Composições
   // (grade de stats, título "Remover", texto "(preencher)" etc.) — os
   // textos estáticos do modal (hint, títulos de painel, botão Limpar) já
   // são cobertos pelo data-i18n/applyTranslations.
@@ -990,8 +990,165 @@ function refreshContentLabels() {
     const text = chip.querySelector(".chip-main span:not(.chip-status)");
     if (text) text.innerText = label;
   });
+  if (typeof refreshEventLabels === "function") refreshEventLabels();
 }
 window.refreshContentLabels = refreshContentLabels;
+
+// =========================================================
+// EVENT CONTENT (coluna "Evento Content" — tecla ' vira a coluna de conteúdo)
+// Lista FIXA de conteúdos de evento da temporada: quem mantém o site edita SÓ este array.
+//   id     → chave estável (vai no backup JSON; não mude depois de publicado, senão o "feito" se perde)
+//   labels → nome exibido por idioma (falta idioma → usa en, depois pt-BR, depois o id)
+//   until  → (opcional) data/hora de fim em ISO; depois dela o evento some sozinho da coluna
+// Para ADICIONAR um evento novo: copie um bloco { ... }, troque o id e os nomes.
+// Para ENCERRAR um evento: apague o bloco (ou comente). Nada mais precisa ser mexido.
+// =========================================================
+// Server Time (como usado nos patch notes) está 5h à frente do horário de Brasília
+// (GMT-3) → Server Time = UTC+2, fixo (o jogo não observa horário de verão).
+const SERVER_TZ_OFFSET_MS = 2 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const EVENT_CONTENTS = [
+  // Semente (usada até a primeira busca funcionar e se o site estiver fora do ar).
+  // Fonte: dnorigins.com/news → [Patch] 20-09-2026 (seção "Events")
+  {
+    id: "crazy-duck-nest",
+    labels: { en: "Crazy Duck Nest" },
+    until: "2026-10-04T22:00:00Z"   // fim: 5 de outubro 00:00 Server Time (= 04/10 22:00 UTC)
+    // sem "days": roda todo dia
+  },
+  {
+    id: "althea-continent-exploration",
+    labels: { en: "Althea Continent Exploration" },
+    until: "2026-10-10T07:00:00Z", // fim: 10 de outubro 09:00 Server Time (= 10/10 07:00 UTC)
+    days: [5, 6, 0]                 // só sex/sáb/dom, contados em Server Time (ver isEventActiveNow)
+  }
+];
+
+// Está dentro do período (until) E, se o evento só roda em certos dias (days, índices
+// JS: domingo=0...sábado=6), hoje é um desses dias — contado em SERVER TIME, não no
+// horário local de quem está vendo a tela.
+function isEventActiveNow(ev, nowMs) {
+  if (ev.until && Date.parse(ev.until) <= nowMs) return false;
+  if (ev.days && ev.days.length) {
+    const dow = new Date(nowMs + SERVER_TZ_OFFSET_MS).getUTCDay();
+    if (!ev.days.includes(dow)) return false;
+  }
+  return true;
+}
+
+// "05/10/2026 - Tempo restante: 3 dias 5 horas" — data de fim (em horário de Brasília,
+// GMT-3, igual ao resto do site) + tempo restante em dias e horas, no idioma escolhido.
+// Sem "until" (evento sem data marcada no patch) devolve null e o chip fica só com o nome.
+// d/h = [singular, plural]; idiomas sem plural repetem a mesma palavra.
+const EVENT_TIME_WORDS = {
+  "pt-BR": { left: "Tempo restante",    d: ["dia", "dias"],     h: ["hora", "horas"] },
+  "pt-PT": { left: "Tempo restante",    d: ["dia", "dias"],     h: ["hora", "horas"] },
+  es:      { left: "Tiempo restante",   d: ["día", "días"],     h: ["hora", "horas"] },
+  en:      { left: "Time remaining",    d: ["day", "days"],     h: ["hour", "hours"] },
+  ru:      { left: "Осталось",          d: ["дн.", "дн."],      h: ["ч.", "ч."] },
+  fil:     { left: "Natitirang oras",   d: ["araw", "araw"],    h: ["oras", "oras"] },
+  id:      { left: "Sisa waktu",        d: ["hari", "hari"],    h: ["jam", "jam"] },
+  zh:      { left: "剩余时间",           d: ["天", "天"],         h: ["小时", "小时"] },
+  fr:      { left: "Temps restant",     d: ["jour", "jours"],   h: ["heure", "heures"] },
+  de:      { left: "Verbleibende Zeit", d: ["Tag", "Tage"],     h: ["Stunde", "Stunden"] }
+};
+function formatEventSublabel(ev, nowMs) {
+  if (!ev.until) return null;
+  const untilMs = Date.parse(ev.until);
+  if (!isFinite(untilMs)) return null;
+  const BR_TZ_OFFSET_MS = -3 * 60 * 60 * 1000;
+  const shifted = new Date(untilMs + BR_TZ_OFFSET_MS);
+  const dd = String(shifted.getUTCDate()).padStart(2, "0");
+  const mm = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = shifted.getUTCFullYear();
+  const left = Math.max(0, untilMs - nowMs);
+  const days = Math.floor(left / DAY_MS);
+  const hours = Math.floor((left % DAY_MS) / (60 * 60 * 1000));
+  const w = EVENT_TIME_WORDS[getCurrentLang()] || EVENT_TIME_WORDS.en;
+  return `${dd}/${mm}/${yyyy} - ${w.left}: ${days} ${w.d[days === 1 ? 0 : 1]} ${hours} ${w.h[hours === 1 ? 0 : 1]}`;
+}
+
+// Mantém "Tempo restante: X dias Y horas" atualizado sem precisar recriar os chips.
+function updateEventSublabels() {
+  const now = Date.now();
+  document.querySelectorAll(".event-chip .chip-sublabel[data-until]").forEach((el) => {
+    const t = formatEventSublabel({ until: el.dataset.until }, now);
+    if (t && el.textContent !== t) el.textContent = t;
+  });
+}
+window.updateEventSublabels = updateEventSublabels;
+setInterval(updateEventSublabels, 30000);
+
+// Patch mais recente lido do dnorigins.com ({ title, url, published }) — usado no cabeçalho
+// da coluna quando ela está no modo Evento.
+// Semente: o tópico do patch de onde vêm os eventos da lista fixa acima. A busca automática
+// (Netlify Function) e o cache substituem isto pelo patch mais recente.
+let EVENT_PATCH = { title: "[Patch] 20-09-2026", url: "https://dnorigins.com/news/patch-20-09-2026/" };
+
+// Busca automática dos eventos: a cada importação de backup (e ao abrir a página) o site consulta
+// a Netlify Function netlify/functions/dno-events.js, que lê o [Patch] mais recente de
+// dnorigins.com/news. Sem a função no ar (ex.: abrindo o index.html direto do computador),
+// a busca falha em silêncio e continua valendo a última lista conhecida.
+// Ambiente: o site roda em dois cenários.
+//  • Com servidor (Netlify publicado ou `netlify dev`): as Functions (/api/presence, /api/party-share,
+//    /.netlify/functions/dno-events) existem e tudo funciona (contador real, convites, eventos).
+//  • Aberto direto do computador (file://): não há Functions; o navegador bloqueia qualquer fetch. Nesse modo o
+//    site nem tenta chamá-las (sem erros no console) e usa os fallbacks locais (contador local, última lista de eventos).
+// Um servidor estático simples (ex.: python -m http.server) responde 404 às Functions; isso é detectado em runtime
+// (apiMissing, no bloco de presença) e as chamadas passam a ser raras.
+const DNO_IS_FILE = location.protocol === "file:";
+const EVENTS_ENDPOINT = "/.netlify/functions/dno-events";
+const EVENTS_CACHE_KEY = "dnoEventsCache";
+
+const EVENT_EMPTY_TEXT = {
+  "pt-BR": "Não há evento ocorrendo.",
+  "pt-PT": "Não há nenhum evento a decorrer.",
+  es: "No hay ningún evento en curso.",
+  en: "No event is currently running.",
+  ru: "Сейчас нет активных событий.",
+  fil: "Walang kasalukuyang event.",
+  id: "Tidak ada event yang sedang berlangsung.",
+  zh: "当前没有进行中的活动。",
+  fr: "Aucun événement en cours.",
+  de: "Derzeit läuft kein Event."
+};
+function getEventEmptyText() {
+  return EVENT_EMPTY_TEXT[getCurrentLang()] || EVENT_EMPTY_TEXT.en;
+}
+
+// Troca a lista de eventos em uso (mantém o mesmo array, que é lido em vários lugares).
+function setEventList(list) {
+  EVENT_CONTENTS.splice(0, EVENT_CONTENTS.length, ...list.map((e) => ({
+    id: e.id,
+    labels: e.labels || { en: e.name || e.id },
+    until: e.until || null,
+    days: Array.isArray(e.days) && e.days.length ? e.days : undefined
+  })));
+}
+try {
+  const cached = JSON.parse(localStorage.getItem(EVENTS_CACHE_KEY) || "null");
+  if (cached && Array.isArray(cached.events)) setEventList(cached.events);
+  if (cached && cached.patch && cached.patch.url) EVENT_PATCH = cached.patch;
+} catch (_) {}
+
+function getEventLabel(ev) {
+  const l = ev.labels || {};
+  return l[getCurrentLang()] || l.en || l["pt-BR"] || ev.id;
+}
+
+// Re-labels the event chips already on screen after a language switch.
+function refreshEventLabels() {
+  document.querySelectorAll(".event-chip").forEach((chip) => {
+    const ev = EVENT_CONTENTS.find((e) => e.id === chip.dataset.eventId);
+    if (!ev) return;
+    const label = getEventLabel(ev);
+    chip.title = label;
+    const text = chip.querySelector(".chip-label");
+    if (text) text.innerText = label;
+  });
+  document.querySelectorAll(".event-empty").forEach((el) => { el.textContent = getEventEmptyText(); });
+}
 
 let activeGearFlyouts = [];
 let activeNickPopover = null;
@@ -1140,7 +1297,9 @@ document.addEventListener("DOMContentLoaded", () => {
     importFileInput.value = "";
   });
 
-  async function exportData() {
+  // Monta o objeto de backup a partir da tabela. Separado do exportData para poder ser
+  // reutilizado (ex.: Criador de Grupos → convite online, que envia uma versão enxuta).
+  function buildBackupData() {
     const data = { savedAt: Date.now(), characters: [], presets: presets.map((p) => ({ name: p.name, contents: [...p.contents] })) };
 
     document.querySelectorAll("#tablesWrapper tbody tr").forEach((row) => {
@@ -1165,8 +1324,15 @@ document.addEventListener("DOMContentLoaded", () => {
         contents.push(entry);
       });
 
-      data.characters.push({ classId, nickname, gear, contents });
+      data.characters.push({ classId, nickname, gear, contents, events: collectDoneEvents(row) });
     });
+
+    return data;
+  }
+  window.buildBackupData = buildBackupData;
+
+  async function exportData() {
+    const data = buildBackupData();
 
     const jsonStr = JSON.stringify(data, null, 2);
     const dateStr = new Date().toISOString().slice(0, 10);
@@ -1233,7 +1399,7 @@ document.addEventListener("DOMContentLoaded", () => {
         data.characters.forEach((charData) => {
           const cls = ALL_CLASSES.find((c) => c.id === charData.classId);
           if (!cls) return;
-          addClassRow(cls, charData.nickname || cls.name, charData.gear, charData.contents);
+          addClassRow(cls, charData.nickname || cls.name, charData.gear, charData.contents, charData.events);
         });
         refreshAllPresetMenus();
 
@@ -1242,6 +1408,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.applyContentResetsSince) {
           window.applyContentResetsSince(Number(data.savedAt) || file.lastModified);
         }
+        // Importou arquivo → confere no dnorigins.com quais eventos estão ocorrendo (patch mais recente).
+        if (window.refreshEventsFromSite) window.refreshEventsFromSite();
       } catch (err) {
         alert("Failed to import backup file: " + err.message);
       }
@@ -1379,6 +1547,7 @@ document.addEventListener("DOMContentLoaded", () => {
       </table>
     `;
     tablesWrapper.appendChild(container);
+    if (window.applyContentHeaderState) window.applyContentHeaderState();
     return container.querySelector("tbody");
   }
   // Also used by the drag & drop code (second DOMContentLoaded block) to open a
@@ -1396,7 +1565,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return createNewTableContainer();
   }
 
-  function addClassRow(cls, nickname, initialGear = null, initialContents = null) {
+  function addClassRow(cls, nickname, initialGear = null, initialContents = null, initialEvents = null) {
     const targetBody = getTargetTableBody();
     const row = document.createElement("tr");
     row.dataset.classId = cls.id;
@@ -1689,7 +1858,23 @@ document.addEventListener("DOMContentLoaded", () => {
     contentsTd.className = "col-content";
     const chipsContainer = document.createElement("div");
     chipsContainer.className = "content-chips-container";
-    contentsTd.appendChild(chipsContainer);
+
+    // Duas "faces" na mesma célula: frente = Class Content (chips normais),
+    // verso = Event Content (chips fixos da temporada). A tecla ' gira a coluna.
+    const flip = document.createElement("div");
+    flip.className = "content-flip";
+    const flipInner = document.createElement("div");
+    flipInner.className = "content-flip-inner";
+    const faceFront = document.createElement("div");
+    faceFront.className = "content-face content-face-front";
+    faceFront.appendChild(chipsContainer);
+    const faceBack = document.createElement("div");
+    faceBack.className = "content-face content-face-back";
+    faceBack.appendChild(buildEventChipsContainer(initialEvents));
+    flipInner.appendChild(faceFront);
+    flipInner.appendChild(faceBack);
+    flip.appendChild(flipInner);
+    contentsTd.appendChild(flip);
 
     row.appendChild(classTd);
     row.appendChild(contentsTd);
@@ -2098,6 +2283,198 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ---------- Event Content (verso da coluna de conteúdo) ----------
+  // Chips FIXOS (vêm de EVENT_CONTENTS): só marcam feito/pendente, sem botão de remover.
+  // Usam a classe .event-chip (não .content-chip) de propósito, para não entrarem no
+  // filtro, nos resets semanais/diários nem na lista "contents" do backup.
+  function buildEventChipsContainer(doneIds) {
+    const done = new Set(Array.isArray(doneIds) ? doneIds : []);
+    const container = document.createElement("div");
+    container.className = "event-chips-container";
+
+    let col = null;
+    const now = Date.now();
+    const activeEvents = EVENT_CONTENTS.filter((ev) => isEventActiveNow(ev, now));
+
+    // Ids marcados como feitos que ainda não têm chip (ex.: backup com evento de um patch novo,
+    // antes da busca terminar) ficam guardados aqui e voltam a valer quando o chip aparecer.
+    const known = new Set(activeEvents.map((ev) => ev.id));
+    const pending = [...done].filter((id) => !known.has(id));
+    if (pending.length) container.dataset.pendingDone = JSON.stringify(pending);
+
+    if (!activeEvents.length) {
+      const empty = document.createElement("div");
+      empty.className = "event-empty";
+      empty.textContent = getEventEmptyText();
+      container.appendChild(empty);
+      return container;
+    }
+
+    activeEvents.forEach((ev, i) => {
+      if (i % 3 === 0) {
+        col = document.createElement("div");
+        col.className = "content-chip-col";
+        container.appendChild(col);
+      }
+      const chip = document.createElement("div");
+      chip.className = "event-chip";
+      chip.dataset.eventId = ev.id;
+      chip.title = getEventLabel(ev);
+
+      const top = document.createElement("div");
+      top.className = "chip-top";
+      const main = document.createElement("div");
+      main.className = "chip-main";
+      const status = document.createElement("span");
+      status.className = "chip-status";
+      const text = document.createElement("span");
+      text.className = "chip-label";
+      text.innerText = getEventLabel(ev);
+
+      // Data de fim + dias restantes, no mesmo estilo do "Reset em HH:MM" do chip
+      // Missão diária: um .chip-sublabel na mesma linha do nome, não uma segunda linha.
+      const sublabelText = formatEventSublabel(ev, now);
+      let sub = null;
+      if (sublabelText) {
+        sub = document.createElement("span");
+        sub.className = "chip-sublabel";
+        sub.dataset.until = ev.until;
+        sub.textContent = sublabelText;
+      }
+
+      const setDone = (d) => {
+        status.innerHTML = d ? CHIP_ICON_CHECK : CHIP_ICON_X;
+        chip.classList.toggle("done", d);
+      };
+      const toggle = () => setDone(!chip.classList.contains("done"));
+      status.addEventListener("click", toggle);
+      text.addEventListener("click", toggle);
+      setDone(done.has(ev.id));
+
+      main.appendChild(status);
+      main.appendChild(text);
+      if (sub) main.appendChild(sub);
+      top.appendChild(main);
+      chip.appendChild(top);
+      col.appendChild(chip);
+    });
+    return container;
+  }
+
+  function collectDoneEvents(row) {
+    return Array.from(row.querySelectorAll(".event-chip.done")).map((c) => c.dataset.eventId);
+  }
+  window.collectDoneEvents = collectDoneEvents;
+
+  // Refaz os chips de evento de todas as linhas com a lista atual, mantendo o que já estava marcado.
+  function rebuildEventChips() {
+    document.querySelectorAll(".event-chips-container").forEach((old) => {
+      const ids = Array.from(old.querySelectorAll(".event-chip.done")).map((c) => c.dataset.eventId);
+      let pending = [];
+      try { pending = JSON.parse(old.dataset.pendingDone || "[]"); } catch (_) {}
+      old.replaceWith(buildEventChipsContainer([...ids, ...pending]));
+    });
+  }
+  window.rebuildEventChips = rebuildEventChips;
+
+  let eventsFetching = null;
+  // Consulta o site (via Netlify Function) e atualiza a coluna Event Content.
+  // Chamada a cada importação de backup e uma vez ao abrir a página.
+  window.refreshEventsFromSite = function () {
+    if (eventsFetching) return eventsFetching;
+    if (DNO_IS_FILE) return Promise.resolve(false);   // sem Functions em file://: segue com a última lista conhecida
+    eventsFetching = fetch(EVENTS_ENDPOINT, { cache: "no-store" })
+      .then((res) => { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then((data) => {
+        if (!data || !Array.isArray(data.events)) throw new Error("resposta inesperada");
+        setEventList(data.events);
+        if (data.patch && data.patch.url) EVENT_PATCH = data.patch;
+        try { localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify({ events: data.events, patch: data.patch, savedAt: Date.now() })); } catch (_) {}
+        rebuildEventChips();
+        if (window.applyContentHeaderState) window.applyContentHeaderState();
+        return true;
+      })
+      .catch((err) => {
+        console.warn("[eventos] não foi possível atualizar pelo dnorigins.com:", err && err.message);
+        return false;
+      })
+      .finally(() => { eventsFetching = null; });
+    return eventsFetching;
+  };
+  setTimeout(() => window.refreshEventsFromSite(), 800); // ao abrir a página
+
+  // Tecla ' → gira a coluna de conteúdo (Class Content ⇄ Event Content). A coluna Class não gira.
+  // O título do patch já começa com "[Patch]", então o rótulo é só "Evento:".
+  const EVENT_PATCH_LABEL = {
+    "pt-BR": "Evento:",
+    "pt-PT": "Evento:",
+    es: "Evento:",
+    en: "Event:",
+    ru: "Событие:",
+    fil: "Event:",
+    id: "Event:",
+    zh: "活动:",
+    fr: "Événement :",
+    de: "Event:"
+  };
+  let eventViewOn = false;
+
+  // Cabeçalho da coluna de conteúdo em duas faces, com o MESMO giro 3D das células
+  // (classes .content-flip*, acionadas por html.events-view):
+  //   frente: "Class Content" (traduzido)   verso: "Evento: [Patch] dd-mm-aaaa" (link do patch)
+  // As duas faces ficam dentro de spans, sem data-i18n no <th>, então a tradução
+  // automática dos cabeçalhos não desmonta a estrutura; o texto é refeito aqui.
+  function setContentHeaders() {
+    document.querySelectorAll("th.col-content").forEach((th) => {
+      let front = th.querySelector(".content-face-front");
+      let back = th.querySelector(".content-face-back");
+      if (!front || !back) {
+        delete th.dataset.i18n;
+        th.textContent = "";
+        const flip = document.createElement("div");
+        flip.className = "content-flip th-flip";
+        const inner = document.createElement("div");
+        inner.className = "content-flip-inner";
+        front = document.createElement("span");
+        front.className = "content-face content-face-front";
+        back = document.createElement("span");
+        back.className = "content-face content-face-back";
+        inner.appendChild(front);
+        inner.appendChild(back);
+        flip.appendChild(inner);
+        th.appendChild(flip);
+      }
+      front.textContent = i18n("tableContent", "Class Content");
+
+      back.textContent = "";
+      back.appendChild(document.createTextNode((EVENT_PATCH_LABEL[getCurrentLang()] || EVENT_PATCH_LABEL.en) + " "));
+      const safe = EVENT_PATCH && /^https:\/\/(www\.)?dnorigins\.com\//i.test(EVENT_PATCH.url || "");
+      const a = document.createElement("a");
+      a.className = "event-patch-link";
+      a.href = safe ? EVENT_PATCH.url : "https://dnorigins.com/news/";
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = safe && EVENT_PATCH.title ? EVENT_PATCH.title : "dnorigins.com/news";
+      back.appendChild(a);
+    });
+  }
+  window.applyContentHeaderState = setContentHeaders; // tabelas novas / idioma novo / patch novo
+  setContentHeaders(); // tabela que já está na tela
+
+  function toggleEventView() {
+    eventViewOn = !eventViewOn;
+    document.documentElement.classList.toggle("events-view", eventViewOn);
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const isApostrophe = e.key === "'" || (e.key === "Dead" && e.code === "Quote");
+    if (!isApostrophe || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+    e.preventDefault();
+    toggleEventView();
+  });
+
   function addContentChipToRow(container, title, isDone = false, accountNumber = null) {
     if (container.querySelector(`[data-title="${title}"]`)) return;
 
@@ -2290,7 +2667,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof applyTranslations === "function") applyTranslations(item.dataset.lang);
       if (typeof refreshClassLabels === "function") refreshClassLabels();
       if (typeof window.refreshCompMaker === "function") window.refreshCompMaker();
+      if (typeof window.refreshAutoParty === "function") window.refreshAutoParty();
       refreshContentLabels();
+      if (typeof window.applyContentHeaderState === "function") window.applyContentHeaderState(); // reaplica o cabeçalho (Classe/Evento) no idioma novo
+      if (typeof window.updateEventSublabels === "function") window.updateEventSublabels();
       if (typeof window.updateDailyCountdowns === "function") window.updateDailyCountdowns(); // sincroniza o "Reset em" na hora, em vez de esperar o próximo tick
     };
   });
@@ -2299,6 +2679,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // (table headers are set by the original function; we add data-i18n attrs after)
   const tablesWrapperEl = document.getElementById("tablesWrapper");
   function translateTableHeaders() {
+    // Cabeçalho da coluna de conteúdo é montado em duas faces (Classe/Evento) por
+    // applyContentHeaderState; tabelas novas passam por aqui e ganham a estrutura.
+    if (typeof window.applyContentHeaderState === "function" &&
+        document.querySelector("#tablesWrapper th.col-content:not(:has(.th-flip))")) {
+      window.applyContentHeaderState();
+    }
     document.querySelectorAll("#tablesWrapper th").forEach(th => {
       if (!th.dataset.i18n) {
         const txt = th.textContent.trim();
@@ -2342,11 +2728,101 @@ document.addEventListener("DOMContentLoaded", () => {
   // FEATURE 1: Screenshot / copy-to-clipboard button
   // -------------------------------------------------------
   const screenshotBtn = document.getElementById("screenshotBtn");
+  const shotImgCache = new Map();   // url -> Promise<dataURL>: imagens do próprio site embutidas na captura
+  let shotBusy = false;
+  let shotFontCSS = null;   // CSS das fontes (Cinzel etc.) embutido no print; calculado uma vez e reaproveitado
+  const HTI_SRC = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+  // Fora da captura: o que não aparece no print (scripts, modais/painéis fechados com a classe .hidden, iframes e
+  // o que é marcado com data-html2canvas-ignore). Menos nós = captura bem mais leve e menos tempo com a tela presa.
+  const SHOT_SKIP_TAGS = new Set(["SCRIPT", "NOSCRIPT", "TEMPLATE", "IFRAME"]);
+  const shotSkip = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (SHOT_SKIP_TAGS.has(el.tagName)) return true;
+    if (el.hasAttribute && el.hasAttribute("data-html2canvas-ignore")) return true;
+    if (el.classList && el.classList.contains("hidden")) return true;
+    return false;
+  };
+  const shotFilter = (node) => !shotSkip(node);
+  // Escalas de captura: alvo 4K (largura 3840 px), limitado pelo tamanho máximo de canvas dos navegadores.
+  const computeShotScales = () => {
+    const w = Math.max(document.body.scrollWidth, document.documentElement.clientWidth) || 1;
+    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) || 1;
+    let t = Math.max(window.devicePixelRatio || 1, 3840 / w);
+    t = Math.max(1, Math.min(t, 16000 / w, 16000 / h, Math.sqrt(120e6 / (w * h))));
+    const list = [t];
+    if (t > 2) list.push(2);
+    if (t > 1) list.push(1);
+    return list;
+  };
+  // Captura rápida com html-to-image: usa o próprio motor do navegador (mantém ícones e SVGs) e é bem mais
+  // leve que o html2canvas. Se falhar, o caminho antigo (html2canvas) assume.
+  const captureFast = async () => {
+    if (typeof htmlToImage === "undefined") await loadScript(HTI_SRC);
+    if (typeof htmlToImage === "undefined") throw new Error("html-to-image indisponível");
+    // Desfaz o giro 3D da coluna de conteúdo só durante a captura (visualmente idêntico ao estado atual)
+    const eventsView = document.documentElement.classList.contains("events-view");
+    const st = document.createElement("style");
+    st.textContent =
+      ".content-flip{perspective:none!important}" +
+      ".content-flip-inner{transform:none!important;transition:none!important;transform-style:flat!important}" +
+      ".content-face{backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+      ".content-face-back{transform:none!important}" +
+      (eventsView ? ".content-face-front{visibility:hidden!important}" : ".content-face-back{visibility:hidden!important}");
+    document.head.appendChild(st);
+    try {
+      if (shotFontCSS === null) {
+        try { shotFontCSS = await htmlToImage.getFontEmbedCSS(document.body, { filter: shotFilter }); } catch (_) { shotFontCSS = ""; }
+      }
+      for (const sc of computeShotScales()) {
+        try {
+          const b = await htmlToImage.toBlob(document.body, {
+            pixelRatio: sc, backgroundColor: "#0c0908", cacheBust: false, filter: shotFilter,
+            fontEmbedCSS: shotFontCSS || undefined
+          });
+          if (b && b.size > 2000) return b;
+        } catch (err) { console.warn("Screenshot (html-to-image) falhou em escala " + sc + ":", err); }
+      }
+      return null;
+    } finally { st.remove(); }
+  };
+  // Aquece o que dá para preparar antes do clique (biblioteca + CSS das fontes), para o print sair sem espera
+  const warmShot = () => {
+    const go = async () => {
+      try {
+        if (typeof htmlToImage === "undefined") await loadScript(HTI_SRC);
+        if (shotFontCSS === null && typeof htmlToImage !== "undefined") {
+          shotFontCSS = await htmlToImage.getFontEmbedCSS(document.body, { filter: shotFilter });
+        }
+      } catch (_) { shotFontCSS = shotFontCSS === null ? null : shotFontCSS; }
+    };
+    if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 4000 }); else setTimeout(go, 2500);
+  };
+  if (screenshotBtn && location.protocol !== "file:") warmShot();
   if (screenshotBtn) {
     screenshotBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (shotBusy) return;
+      shotBusy = true;
       try {
-        // Use html2canvas loaded from CDN (injected below if not present)
+        // Feedback imediato (flash), sem aviso de espera; o flash não entra no print
+        const flash = document.createElement("div");
+        flash.className = "screenshot-flash";
+        flash.setAttribute("data-html2canvas-ignore", "");
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 500);
+        await new Promise((r) => requestAnimationFrame(() => r()));
+
+        let blob = null;
+        let simplified = false;
+        let lastErr = null;
+        // Em file:// o navegador bloqueia a leitura de imagens/CSS: o método rápido falharia sempre (e só gastaria
+        // tempo), então vai direto para o plano B (versão sem imagens).
+        if (location.protocol !== "file:") {
+          try { blob = await captureFast(); } catch (err) { lastErr = err; console.warn("Screenshot rápido falhou:", err); }
+        }
+
+        if (!blob) {
+        // Plano B: html2canvas (mais lento)
         if (typeof html2canvas === "undefined") {
           await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
         }
@@ -2355,32 +2831,119 @@ document.addEventListener("DOMContentLoaded", () => {
         // data-html2canvas-ignore não entram na captura.
         const baseOptions = {
           backgroundColor: "#0c0908",
-          scale: 1,
           useCORS: true,
           allowTaint: false,
           logging: false,
-          ignoreElements: (el) =>
-            el.tagName === "IFRAME" || (el.hasAttribute && el.hasAttribute("data-html2canvas-ignore"))
+          ignoreElements: (el) => shotSkip(el)
         };
 
-        // Versão normal: só tira da cópia as imagens de outro domínio.
+        // Qualidade 4K: a captura é renderizada em escala maior que a tela (largura alvo de 3840 px), para o
+        // texto e os traços continuarem nítidos ao dar zoom. Limita a escala pelo tamanho máximo de canvas dos
+        // navegadores e, se a captura falhar ou sair vazia, tenta de novo com escalas menores.
+        const bodyW = Math.max(document.body.scrollWidth, document.documentElement.clientWidth) || 1;
+        const bodyH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) || 1;
+        // Em file:// só o plano B (html2canvas, bem mais pesado) roda: resolução intermediária (largura ~2560 px, ou o
+        // devicePixelRatio da tela, o que for maior) para a tela não prender. Com servidor (Netlify / netlify dev)
+        // o método rápido usa 3840 px (4K).
+        const legacyWidth = DNO_IS_FILE ? 2560 : 3840;
+        let target = Math.max(window.devicePixelRatio || 1, legacyWidth / bodyW);
+        target = Math.min(target, 16000 / bodyW, 16000 / bodyH, Math.sqrt(120e6 / (bodyW * bodyH)));
+        target = Math.max(1, target);
+        const scales = [target];
+        if (target > 2) scales.push(2);
+        if (target > 1) scales.push(1);
+        let shotScale = target;
+
+        // html2canvas não entende 3D (rotateY / backface-visibility) e desenharia as duas faces da coluna de
+        // conteúdo (Class Content e Event Content) sobrepostas e espelhadas. Na cópia usada para a captura o
+        // giro é desfeito e só a face que está visível na tela é mantida.
+        const flattenFlip = (doc) => {
+          const eventsView = doc.documentElement.classList.contains("events-view");
+          const st = doc.createElement("style");
+          st.textContent =
+            ".content-flip{perspective:none!important}" +
+            ".content-flip-inner{transform:none!important;transition:none!important;transform-style:flat!important;will-change:auto!important}" +
+            ".content-face{backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+            ".content-face-back{transform:none!important}" +
+            (eventsView ? ".content-face-front{visibility:hidden!important}" : ".content-face-back{visibility:hidden!important}");
+          doc.head.appendChild(st);
+        };
+
+        // Imagens do próprio site (ícones de classe, skills...) viram data URL na cópia: assim entram na captura
+        // sem depender de CORS nem "contaminar" o canvas. Imagens de outro domínio são retiradas.
+        // Em file:// o navegador não deixa ler nenhum arquivo local. Para os ícones de classe saírem mesmo assim,
+        // usa o mapa js/class-icons.js (gerado por build-class-icons.mjs) com os PNGs já em data URL.
+        const inlineImages = async (doc) => {
+          const iconMap = window.DNO_CLASS_ICONS || null;
+          const imgs = Array.from(doc.querySelectorAll("img"));
+          await Promise.all(imgs.map(async (img) => {
+            let href = "";
+            try {
+              const u = new URL(img.getAttribute("src") || "", location.href);
+              if (u.protocol === "data:" || u.protocol === "blob:") return;
+              const mm = /\/img\/classes\/([^\/?#]+)\.png$/i.exec(u.pathname);
+              if (mm && iconMap) {
+                const data = iconMap[decodeURIComponent(mm[1])];
+                if (data) { img.removeAttribute("srcset"); img.src = data; return; }
+              }
+              if (u.protocol === "file:") { img.remove(); return; }   // qualquer outra imagem local contaminaria o canvas
+              if (u.origin !== location.origin) { img.remove(); return; }
+              href = u.href;
+              let p = shotImgCache.get(href);
+              if (!p) {
+                p = fetch(href).then((r) => {
+                  if (!r.ok) throw new Error("HTTP " + r.status);
+                  return r.blob();
+                }).then((bl) => new Promise((res, rej) => {
+                  const fr = new FileReader();
+                  fr.onload = () => res(fr.result);
+                  fr.onerror = () => rej(fr.error);
+                  fr.readAsDataURL(bl);
+                }));
+                shotImgCache.set(href, p);
+              }
+              const data = await p;
+              img.removeAttribute("srcset");
+              img.src = data;
+            } catch (_) {
+              if (href) shotImgCache.delete(href);   // mantém o src original nesse caso
+            }
+          }));
+        };
+
+        // Backgrounds/máscaras com url(...) (imagens de CSS) saem da cópia: em file:// contaminariam o canvas.
+        const stripUrlBackgrounds = (doc) => {
+          const win = doc.defaultView;
+          doc.querySelectorAll("*").forEach((el) => {
+            try {
+              const cs = win.getComputedStyle(el);
+              ["backgroundImage", "listStyleImage", "borderImageSource", "webkitMaskImage"].forEach((prop) => {
+                const v = cs[prop];
+                if (v && v.indexOf("url(") !== -1) {
+                  const cssName = prop.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
+                  el.style.setProperty(cssName, "none", "important");
+                }
+              });
+            } catch (_) {}
+          });
+        };
+
+        // Versão normal: mantém as imagens do site (embutidas) e tira só as de outro domínio.
         const renderNormal = () => html2canvas(document.body, {
-          ...baseOptions,
-          onclone: (doc) => {
-            doc.querySelectorAll("img").forEach((img) => {
-              try {
-                const u = new URL(img.src, location.href);
-                if (u.protocol !== "data:" && u.protocol !== "blob:" && u.origin !== location.origin) img.remove();
-              } catch (_) {}
-            });
+          ...baseOptions, scale: shotScale,
+          onclone: async (doc) => {
+            flattenFlip(doc);
+            await inlineImages(doc);
+            if (DNO_IS_FILE) stripUrlBackgrounds(doc);
           }
         });
 
         // Versão simplificada: sem nenhuma imagem (img, svg, canvas, vídeo e backgrounds com url()).
         // Nenhuma imagem = nenhuma chance de "contaminar" o canvas; só o texto e as cores da tela saem.
         const renderSimple = () => html2canvas(document.body, {
-          ...baseOptions,
+          ...baseOptions, scale: shotScale,
           onclone: (doc) => {
+            flattenFlip(doc);
             doc.querySelectorAll("img, svg, canvas, video, iframe").forEach((el) => el.remove());
             const win = doc.defaultView;
             doc.querySelectorAll("*").forEach((el) => {
@@ -2403,27 +2966,37 @@ document.addEventListener("DOMContentLoaded", () => {
           try { cv.getContext("2d").getImageData(0, 0, 1, 1); return false; } catch (_) { return true; }
         };
 
-        // Aberta como arquivo local (file://), o navegador trata TODA imagem como de outra origem e
-        // contamina o canvas: nesse caso já vai direto para a versão simplificada.
-        let simplified = location.protocol === "file:";
-        let canvas = null;
-        if (!simplified) {
-          try { canvas = await renderNormal(); } catch (_) { canvas = null; }
-          if (!canvas || isTainted(canvas)) { canvas = null; simplified = true; }
+        // Em file:// qualquer imagem lida do disco contamina o canvas; por isso só entram os ícones embutidos
+        // (js/class-icons.js) e, se mesmo assim o canvas ficar contaminado, cai na versão simplificada.
+        simplified = false;
+        // Em file:// carrega o mapa de ícones (se existir) para os ícones de classe entrarem no print
+        if (DNO_IS_FILE && !window.DNO_CLASS_ICONS) { try { await loadScript("js/class-icons.js"); } catch (_) {} }
+        if (DNO_IS_FILE && !window.DNO_CLASS_ICONS) {
+          console.warn("Screenshot: js/class-icons.js não encontrado, então os ícones de classe não entram no print em file://. " +
+            "Rode `node build-class-icons.mjs` na pasta do projeto, ou abra o site por `node serve.mjs`.");
         }
-        if (!canvas) canvas = await renderSimple();
-
-        // Flash effect
-        const flash = document.createElement("div");
-        flash.className = "screenshot-flash";
-        document.body.appendChild(flash);
-        setTimeout(() => flash.remove(), 500);
-
-        const blob = await new Promise((resolve, reject) => {
+        let canvas = null;
+        for (const sc of scales) {
+          shotScale = sc;
+          canvas = null; blob = null;
+          simplified = false;
           try {
-            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob vazio"))), "image/png");
-          } catch (err) { reject(err); }
-        });
+            if (!simplified) {
+              try { canvas = await renderNormal(); }
+              catch (err) { canvas = null; lastErr = err; console.warn("Screenshot (normal) falhou em escala " + sc + ":", err); }
+              if (canvas && isTainted(canvas)) { canvas = null; console.warn("Screenshot (normal): canvas contaminado"); }
+              if (!canvas) simplified = true;
+            }
+            if (!canvas) canvas = await renderSimple();
+            if (!canvas || !canvas.width || !canvas.height) continue;
+            blob = await new Promise((resolve) => {
+              try { canvas.toBlob((b) => resolve(b), "image/png"); } catch (_) { resolve(null); }
+            });
+            if (blob) break;
+          } catch (err) { lastErr = err; }
+        }
+        }   // fim do plano B
+        if (!blob) throw lastErr || new Error("toBlob vazio");
 
         // Try clipboard first, fallback to download
         let copied = false;
@@ -2448,6 +3021,8 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         showToast(i18n("toastError", "⚠️ Não foi possível capturar a tela: ") + (err && err.name ? err.name : "erro"));
         console.error("Screenshot error:", err);
+      } finally {
+        shotBusy = false;
       }
     });
   }
@@ -2465,9 +3040,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function showToast(msg) {
     const t = document.createElement("div");
     t.className = "screenshot-toast";
+    t.setAttribute("data-html2canvas-ignore", "");   // o aviso não aparece dentro do print
     t.textContent = msg;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 2600);
+    return t;
   }
   window.showToast = showToast;
 
@@ -2683,8 +3260,164 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el) el.textContent = n;
   }
 
+  // -------------------------------------------------------
+  // Criador de Grupos — convite online
+  // Cada heartbeat leva o nome público desta pessoa (nickname da PRIMEIRA classe da
+  // tabela, coluna "Classe" — a mesma que vira characters[0] no backup) e traz de volta
+  // a lista de quem está online + os convites recebidos. O envio dos dados só acontece
+  // depois que a pessoa clica em "Aceitar".
+  // -------------------------------------------------------
+  const SHARE_URL = "/api/party-share";
+  let onlineUsers = [];      // [{ pub, name, classId }] — sem a própria pessoa
+  let presenceLive = false;  // true = a function de presença respondeu no último heartbeat
+  let apiMissing = false;    // true = servidor sem as Functions (404/405), ex.: servidor estático simples
+  let hbCount = 0;
+  window.isLocalMode = () => DNO_IS_FILE || apiMissing;   // usado pelo Criador de Grupos para explicar por que não há convites
+
+  function getShareProfile() {
+    try {
+      const row = document.querySelector("#tablesWrapper tbody tr");
+      if (!row) return null;
+      const el = row.querySelector(".class-nickname");
+      const name = ((el && (el.dataset.nickname || el.textContent)) || "").trim();
+      const classId = row.dataset.classId || (el && el.dataset.classId) || "";
+      return name ? { name: name.slice(0, 30), classId } : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Versão enxuta do backup para compartilhar: só o que o Criador de Grupos usa
+  // (classe, nickname, gear e conteúdos feitos/pendentes). Number ID (account),
+  // eventos e presets ficam de fora.
+  function buildSharedPayload() {
+    const full = window.buildBackupData();
+    return {
+      savedAt: full.savedAt,
+      characters: (full.characters || []).map((c) => ({
+        classId: c.classId,
+        nickname: c.nickname,
+        gear: c.gear,
+        contents: (c.contents || []).map((x) => ({ title: x.title, done: !!x.done }))
+      }))
+    };
+  }
+
+  const inviteCards = new Map();   // reqId -> elemento do aviso
+  const answeredInvites = new Set();
+
+  function ensureInviteHost() {
+    let host = document.getElementById("inviteHost");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "inviteHost";
+      host.className = "invite-host";
+      host.setAttribute("data-html2canvas-ignore", "");
+      document.body.appendChild(host);
+    }
+    return host;
+  }
+
+  function dropInviteCard(reqId) {
+    const card = inviteCards.get(reqId);
+    if (card) card.remove();
+    inviteCards.delete(reqId);
+  }
+
+  async function respondInvite(inv, accept, buttons) {
+    answeredInvites.add(inv.reqId);
+    buttons.forEach((b) => { b.disabled = true; });
+    try {
+      const payload = { action: "respond", id: SESSION_ID, reqId: inv.reqId, accept };
+      if (accept) {
+        if (typeof window.buildBackupData !== "function") throw new Error("no data");
+        payload.data = buildSharedPayload();
+      }
+      const res = await fetch(SHARE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok && res.status !== 404 && res.status !== 410) throw new Error("share " + res.status);
+      if (accept && res.ok) showToast(i18n("apSentToast", "📤 Dados enviados"));
+    } catch (_) {
+      answeredInvites.delete(inv.reqId);
+      buttons.forEach((b) => { b.disabled = false; });
+      showToast(i18n("apShareError", "⚠️ Não foi possível enviar seus dados"));
+      return;
+    }
+    dropInviteCard(inv.reqId);
+  }
+
+  function showInviteCard(inv) {
+    const card = document.createElement("div");
+    card.className = "invite-card";
+    card.setAttribute("role", "alertdialog");
+
+    const head = document.createElement("div");
+    head.className = "invite-head";
+    if (inv.fromClassId) {
+      const img = document.createElement("img");
+      img.src = "img/classes/" + encodeURIComponent(inv.fromClassId) + ".png";
+      img.alt = "";
+      img.onerror = () => { img.style.display = "none"; };
+      head.appendChild(img);
+    }
+    const text = document.createElement("div");
+    text.className = "invite-text";
+    const who = document.createElement("strong");
+    who.textContent = inv.fromName || "?";
+    const msg = document.createElement("span");
+    msg.textContent = " " + i18n("apInboundText", "quer importar os dados dos seus personagens para montar uma party.");
+    text.appendChild(who);
+    text.appendChild(msg);
+    head.appendChild(text);
+
+    const actions = document.createElement("div");
+    actions.className = "invite-actions";
+    const decline = document.createElement("button");
+    decline.type = "button";
+    decline.className = "invite-btn";
+    decline.textContent = i18n("apDecline", "Recusar");
+    const accept = document.createElement("button");
+    accept.type = "button";
+    accept.className = "invite-btn accept";
+    accept.textContent = i18n("apAccept", "Aceitar");
+    decline.addEventListener("click", () => respondInvite(inv, false, [accept, decline]));
+    accept.addEventListener("click", () => respondInvite(inv, true, [accept, decline]));
+    actions.appendChild(decline);
+    actions.appendChild(accept);
+
+    card.appendChild(head);
+    card.appendChild(actions);
+    ensureInviteHost().appendChild(card);
+    inviteCards.set(inv.reqId, card);
+  }
+
+  // "list" = convites pendentes que o servidor devolveu neste heartbeat.
+  function handleIncomingInvites(list) {
+    const ids = new Set(list.map((i) => i && i.reqId));
+    // convite cancelado/expirado/respondido em outro lugar → o aviso some sozinho
+    Array.from(inviteCards.keys()).forEach((reqId) => { if (!ids.has(reqId)) dropInviteCard(reqId); });
+    list.forEach((inv) => {
+      if (!inv || !inv.reqId || inviteCards.has(inv.reqId) || answeredInvites.has(inv.reqId)) return;
+      showInviteCard(inv);
+    });
+  }
+
   async function heartbeat() {
     touchOwnTab();
+    // Sem Functions (file:// ou servidor estático): não chama a API (ou chama só de vez em quando, para o caso de
+    // ela aparecer) e usa o contador local.
+    if (DNO_IS_FILE || (apiMissing && (hbCount++ % 6) !== 0)) {
+      showOnline(localCount());
+      lastRegions = null;
+      lastCountries = null;
+      presenceLive = false;
+      if (typeof window.refreshRegionPanel === "function") window.refreshRegionPanel();
+      window.dispatchEvent(new Event("dn:online-users"));
+      return;
+    }
     try {
       const res = await fetch(PRESENCE_URL, {
         method: "POST",
@@ -2692,31 +3425,43 @@ document.addEventListener("DOMContentLoaded", () => {
         // region/country não são mais enviados aqui: o backend agora calcula
         // isso sozinho a partir do IP real da requisição (context.geo da
         // Netlify), então o que o navegador mandasse seria ignorado mesmo.
-        body: JSON.stringify({ id: SESSION_ID }),
+        // name/classId = nickname e classe da 1ª linha da tabela (convite do Criador de Grupos).
+        body: JSON.stringify({ id: SESSION_ID, ...(getShareProfile() || {}) }),
         cache: "no-store"
       });
+      if (res.status === 404 || res.status === 405) apiMissing = true;
       if (!res.ok) throw new Error(`presence ${res.status}`);
       const data = await res.json();
       if (typeof data.count !== "number") throw new Error("bad response");
+      apiMissing = false;
       showOnline(data.count);
       lastRegions = (data.regions && typeof data.regions === "object") ? data.regions : null;
       lastCountries = (data.countries && typeof data.countries === "object") ? data.countries : null;
+      presenceLive = true;
+      onlineUsers = Array.isArray(data.users) ? data.users.filter((u) => u && u.pub && u.name) : [];
+      handleIncomingInvites(Array.isArray(data.invites) ? data.invites : []);
     } catch (_) {
       showOnline(localCount());
       lastRegions = null;
       lastCountries = null;
+      presenceLive = false; // mantém a última lista e os avisos abertos: falha de rede é passageira
     }
     if (typeof window.refreshRegionPanel === "function") window.refreshRegionPanel();
+    window.dispatchEvent(new Event("dn:online-users"));
   }
   window.getOnlineRegions = () => lastRegions || localRegions();
   window.getOnlineCountries = (region) => (lastCountries && lastCountries[region]) || localCountries(region);
   window.VISITOR_REGION = VISITOR_REGION;
   window.VISITOR_COUNTRY = VISITOR_COUNTRY;
+  window.getOnlineUsers = () => onlineUsers;
+  window.isPresenceLive = () => presenceLive;
+  window.dnDeviceId = DEVICE_ID; // usado pelo Criador de Grupos para convidar/receber
 
   // Tell the server this session is gone (so the count drops right away) —
   // but only once every tab belonging to this device has closed.
   window.addEventListener("pagehide", () => {
     if (!isLastTabForDevice()) return;
+    if (DNO_IS_FILE || apiMissing) return;
     try {
       const blob = new Blob([JSON.stringify({ id: SESSION_ID, leave: true })], { type: "application/json" });
       navigator.sendBeacon(PRESENCE_URL, blob);
@@ -3349,7 +4094,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const SELECTOR = [
     ".switch-class-popover", ".class-grid", ".content-dropdown-mini", ".gear-flyout-menu",
-    ".content-chips-container", ".manual-modal-body", ".side-menu-panel", ".guide-modal-body",
+    ".content-chips-container", ".event-chips-container", ".manual-modal-body", ".side-menu-panel", ".guide-modal-body",
     ".guide-table-wrapper", ".progression-wrapper", ".filter-panel", ".filter-options",
     "[data-custom-scroll]"
   ].join(",");
@@ -3613,6 +4358,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // Resets automáticos de conteúdo (GMT-3)
 //  - "Missão diária": desmarcada todo dia às 04:00.
 //  - Todos os demais conteúdos: desmarcados todo sábado às 04:00.
+//  - Chips de evento (coluna Event Content): desmarcados todo dia às 04:00.
 // O quadro não fica salvo no navegador (só no backup JSON), então o reset acontece:
 //  1) ao vivo, enquanto a página está aberta (checagem a cada 30 s e ao voltar para a aba);
 //  2) ao importar um backup: vale tudo que "venceu" entre o momento em que o backup foi salvo
@@ -3657,9 +4403,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Eventos (coluna "Event Content") desmarcam todo dia, junto com a Missão diária (04:00 GMT-3).
+  function uncheckEventChips() {
+    document.querySelectorAll("#tablesWrapper .event-chips-container[data-pending-done]").forEach((c) => { delete c.dataset.pendingDone; });
+    document.querySelectorAll("#tablesWrapper .event-chip.done").forEach((chip) => {
+      chip.classList.remove("done");
+      const status = chip.querySelector(".chip-status");
+      if (status) status.innerHTML = RESET_CHIP_ICON_X;
+    });
+  }
+
   function applyResetsBetween(fromMs, toMs) {
     if (!isFinite(fromMs) || !isFinite(toMs) || fromMs >= toMs) return;
-    if (latestBoundary(toMs, false) > fromMs) uncheckChips("daily");
+    if (latestBoundary(toMs, false) > fromMs) { uncheckChips("daily"); uncheckEventChips(); }
     if (latestBoundary(toMs, true) > fromMs) uncheckChips("weekly");
   }
 
@@ -3675,6 +4431,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const now = Date.now();
     applyResetsBetween(lastTick, now);
     lastTick = now;
+    // Remove sozinho o chip de evento que expirou (until) ou saiu da janela de dias
+    // (ex.: Althea, que só roda sex/sáb/dom) e atualiza a data/contagem regressiva
+    // dos que continuam — mesma cadência dos resets, sem precisar dar F5.
+    if (typeof window.rebuildEventChips === "function") window.rebuildEventChips();
   }
   setInterval(tick, 30 * 1000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
@@ -4076,6 +4836,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.getTotalCountries = (region) => (lastTotalCountries && lastTotalCountries[region]) || localTotalCountries(region);
 
   async function loadServerStats() {
+    if (DNO_IS_FILE) return false;   // sem Functions em file://: usa os números locais
     try {
       const res = await fetch("/api/presence", { method: "GET", cache: "no-store" });
       if (!res.ok) throw new Error(`stats ${res.status}`);
@@ -4250,7 +5011,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (chip.dataset.account) entry.account = chip.dataset.account;
         contents.push(entry);
       });
-      data.characters.push({ classId, nickname, gear, contents });
+      data.characters.push({ classId, nickname, gear, contents, events: collectDoneEvents(row) });
     });
     return data;
   }
@@ -4425,3 +5186,1020 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("scroll", updateControlsVisibility, { passive: true });
   updateControlsVisibility();
 });
+
+// =========================================================
+// CRIADOR DE GRUPOS / PARTY MAKER (menu lateral)
+// Recebe 2/4/6/8 backups (.json, um por jogador), o tipo de party e um conteúdo da lista do "+"
+// e monta a melhor composição usando, de cada arquivo, UM personagem que ainda NÃO concluiu
+// esse conteúdo. Botão "Conteúdo concluído" marca os personagens escolhidos como feitos nos
+// arquivos (permite gerar a próxima party) e o histórico guarda composição + status.
+// =========================================================
+(function () {
+  "use strict";
+
+  /* AP-LOGIC-START */
+  // ---------------------------------------------------------------- DADOS
+  const AP_ELEMENTS = {
+    light: ["crusader", "inquisitor", "lightfury", "valkyrie", "ilumia", "guardian", "saint"],
+    fire:  ["adept", "saleana", "darkavenger", "guardian", "crusader", "saint", "souleater", "ripper"],
+    dark:  ["raven", "abysswalker", "darksummoner", "obscuria", "lightfury", "physician"],
+    ice:   ["glaciana", "adept", "guardian", "crusader", "saint"]
+  };
+  const AP_ELEMENT_KEYS = ["light", "fire", "dark", "ice"];
+  // Neutros. Silver Hunter não consta na regra: tratado como DPS neutro.
+  const AP_NEUTRAL_DPS = ["barbarian", "moonlord", "gladiator", "ruina", "defensio", "sentinel", "sniper", "shootingstar", "gearmaster", "silverhunter"];
+  const AP_NEUTRAL_TANK = ["destroyer"];
+  const AP_NEUTRAL_SUPPORT = ["tempest", "windwalker", "spiritdancer", "bladedancer", "flurry"];
+  const AP_NEUTRAL = AP_NEUTRAL_DPS.concat(AP_NEUTRAL_TANK, AP_NEUTRAL_SUPPORT);
+  // Regra de elemento: em party de FOGO, neutros só entram como SUPORTE (Destroyer conta como Support-Tank).
+  // Em Light, Dark e Ice, qualquer neutro (suporte, subdps ou dps) pode ser usado.
+  const AP_FIRE_NEUTRAL_OK = AP_NEUTRAL_SUPPORT.concat(AP_NEUTRAL_TANK);
+
+  // Papéis (conforme a lista de classes das regras)
+  const AP_DPS = ["adept", "saleana", "darkavenger", "raven", "crusader", "barbarian", "moonlord", "gladiator", "ruina",
+                  "sentinel", "sniper", "shootingstar", "gearmaster", "silverhunter"];
+  const AP_SUBDPS = ["inquisitor", "valkyrie", "ilumia", "ripper", "abysswalker", "obscuria", "defensio",
+                     "tempest", "windwalker", "spiritdancer", "bladedancer", "flurry"];
+  const AP_SUPPORT = ["lightfury", "saint", "physician", "guardian", "souleater", "darksummoner", "glaciana", "destroyer"];
+  const AP_HEALERS = ["lightfury", "physician", "saint"];
+  const AP_SUBHEALERS = ["abysswalker"];
+  const AP_TANKS = ["guardian", "crusader", "destroyer", "defensio"];
+  const AP_PURE_TANKS = ["guardian", "destroyer"];      // Support-Tank: não servem de tank na party de 6
+  const AP_HYBRID_TANKS = ["crusader", "defensio"];     // DPS-Tank / SubDPS-Tank
+  // Carry = DPS (fora tanks) + SubDPS ofensivos. Healers, suportes, tanks e SubDPS de cooldown/burst não contam.
+  const AP_CARRY = ["adept", "saleana", "darkavenger", "raven", "barbarian", "moonlord", "gladiator", "ruina",
+                    "sentinel", "sniper", "shootingstar", "gearmaster", "silverhunter", "inquisitor", "valkyrie", "ripper"];
+  // Redução de recarga — ordem de prioridade (tempest/windwalker são cooldown, mas ficam depois)
+  const AP_CD_PRIORITY = ["ilumia", "obscuria", "souleater", "physician", "adept", "tempest", "windwalker"];
+  const AP_BURST = ["souleater", "spiritdancer", "bladedancer", "darksummoner", "physician", "adept"]; // buff de STR/INT
+  const AP_NEEDS_CD = ["sentinel", "gearmaster", "moonlord"];
+  const AP_NEEDS_BURST = ["barbarian", "moonlord", "sniper", "crusader"];
+  const AP_ICE_GUESTS = ["glaciana", "saint"];          // únicas do Ice que entram em party de outro elemento
+  // Suportes de outro elemento (não-Ice) que podem completar a party: "completar com supports e neutros".
+  // Só SUPORTES entram aqui. Ilumia (Light) e Obscuria (Dark) são SubDPS: ter redução de recarga não os torna
+  // suporte, e antes isso deixava uma Obscuria cair numa party de Fogo. Fora do elemento, só no modo relaxado.
+  const AP_FOREIGN_OK = ["lightfury", "physician", "souleater", "darksummoner"];
+  const AP_SUPPORT_SLOT = ["souleater", "darksummoner", "glaciana"]; // "vaga de 1 suporte" quando há convidado Ice
+  const AP_BEAM = 1200;
+  const AP_RANK = { Epic: 1, Unique: 2, Legend: 3 };
+
+  const apElementsOf = (id) => AP_ELEMENT_KEYS.filter((e) => AP_ELEMENTS[e].includes(id));
+  const apKnown = (id) => AP_NEUTRAL.includes(id) || apElementsOf(id).length > 0;
+  const apNeutralAllowed = (id, E) => E !== "fire" || AP_FIRE_NEUTRAL_OK.includes(id);
+  const apFits = (id, E) => (AP_NEUTRAL.includes(id) && apNeutralAllowed(id, E)) || AP_ELEMENTS[E].includes(id);
+  const apIsNeutral = (id) => AP_NEUTRAL.includes(id);
+
+  function apParseGear(g) {
+    if (!g || typeof g !== "object") return { rank: 0, level: 0, enh: 0, text: "" };
+    const text = String(g.text || "");
+    const rarity = g.rarity || text.split(" ")[0];
+    const m = /(\d+)\s*\+(\d+)/.exec(text);
+    return { rank: AP_RANK[rarity] || 0, level: m ? Number(m[1]) : 0, enh: m ? Number(m[2]) : 0, text };
+  }
+  // Hierarquia: Legend 90 > Legend 80 > Unique 90 > Epic 90 > Unique 80 > Epic 80 (rank → nível → posição)
+  const AP_TIER = { 3: { 90: 6, 80: 5 }, 2: { 90: 4, 80: 2 }, 1: { 90: 3, 80: 1 } };
+  const apGearTier = (p) => (p.rank && AP_TIER[p.rank] ? AP_TIER[p.rank][p.level >= 90 ? 90 : 80] : 0);
+  const apGearValue = (p) => (p.rank ? apGearTier(p) * 10 + p.enh * 0.15 : 0);   // +enh (máx. ~2) só desempata dentro do mesmo degrau
+
+  // Faixa de carries por tamanho de party [mín, máx]. Party de 2 não tem regra de carry.
+  const AP_CARRY_RANGE = { 4: [1, 2], 6: [3, 4], 8: [4, 8] };
+
+  // Melhor personagem PENDENTE (conteúdo presente e não concluído) de cada classe de um backup.
+  function apCandidates(data, contentTitle, skip) {
+    const best = new Map();
+    const alt = new Map();
+    ((data && data.characters) || []).forEach((ch, idx) => {
+      if (!ch || !apKnown(ch.classId)) return;
+      const ei = (ch.contents || []).findIndex((c) => c && c.title === contentTitle);
+      if (ei < 0 || ch.contents[ei].done || (skip && skip(ch))) return;
+      const set = apParseGear(ch.gear && ch.gear.set);
+      const wp = apParseGear(ch.gear && ch.gear.weapon);
+      const cand = {
+        classId: ch.classId, nick: ch.nickname || "", idx, ei,
+        setText: set.text, weaponText: wp.text, setRank: set.rank,
+        val: apGearValue(set) + apGearValue(wp) * 0.5,
+        carry: set.rank >= 2 && AP_CARRY.includes(ch.classId)
+      };
+      const cur = best.get(ch.classId);
+      if (!cur || cand.val > cur.val) best.set(ch.classId, cand);
+      // Alternativa sem status de carry (set Epic) da mesma classe: permite respeitar o teto de carries da party
+      if (AP_CARRY.includes(ch.classId) && !cand.carry) {
+        const curNc = alt.get(ch.classId);
+        if (!curNc || cand.val > curNc.val) alt.set(ch.classId, cand);
+      }
+    });
+    alt.forEach((cand, id) => { const b = best.get(id); if (b && b.carry) best.set(id + "#nc", cand); });
+    return Array.from(best.values());
+  }
+
+  // O que existe nos arquivos (para as regras de prioridade de healer)
+  function apContext(files) {
+    const all = [].concat(...files);
+    const nativeHealer = {};
+    AP_ELEMENT_KEYS.forEach((E) => {
+      nativeHealer[E] = all.some((c) => AP_HEALERS.includes(c.classId) && AP_ELEMENTS[E].includes(c.classId));
+    });
+    return { trueHealer: all.some((c) => AP_HEALERS.includes(c.classId)), nativeHealer };
+  }
+
+  // Alvo de classes do elemento: 2 → 1 | 4 → 2 | 6/8 → 4 (ideal 5–6)
+  const apMinElement = (N) => (N >= 6 ? 4 : N >= 4 ? 2 : 1);
+
+  function apEvaluate(ms, E, N, ctx, final) {
+    const ids = ms.map((m) => m.classId);
+    const has = (id) => ids.includes(id);
+    const any = (list) => list.some(has);
+
+    // --- healer
+    const healerMs = ms.filter((m) => AP_HEALERS.includes(m.classId));
+    const healers = healerMs.length;
+    // Sub-healer só assume a vaga se NENHUM arquivo tem healer verdadeiro para o conteúdo
+    const designated = !ctx.trueHealer ? (ms.find((m) => AP_SUBHEALERS.includes(m.classId)) || null) : null;
+    const healerOK = healers > 0 || !!designated;
+    const healerNative = healerMs.some((m) => !m.guest);
+
+    // --- carries (sets Unique/Legend) e mescla
+    const range = AP_CARRY_RANGE[N] || null;
+    const need = range ? range[0] : 0;
+    const maxCarry = range ? range[1] : N;
+    let carries = 0, hasU = false, hasL = false, val = 0;
+    ms.forEach((m) => {
+      val += m.val;
+      if (m !== designated && m.carry && !m.guest) {
+        carries++;
+        if (m.setRank === 2) hasU = true;
+        if (m.setRank === 3) hasL = true;
+      }
+    });
+    const mix = hasU && hasL;
+
+    // --- elemento
+    const eCount = ms.filter((m) => !m.guest && apElementsOf(m.classId).includes(E)).length;
+    const neutralPair = N === 2 && ms.length === 2 && ms.every((m) => apIsNeutral(m.classId));
+    const minE = apMinElement(N);
+    const elementOK = eCount >= minE || neutralPair;
+
+    // --- tank
+    const tankMs = ms.filter((m) => AP_TANKS.includes(m.classId));
+    const tanks = tankMs.length;
+    const tankOK = N >= 8 ? tanks === 1 : N >= 6 ? any(AP_HYBRID_TANKS) : true;
+    let tankWithDps = true;
+    if (tanks === 1) {
+      const t = tankMs[0];
+      const others = ms.filter((m) => m !== t && m !== designated && !AP_HEALERS.includes(m.classId));
+      const dpsCount = others.filter((m) => AP_DPS.includes(m.classId) || AP_SUBDPS.includes(m.classId)).length;
+      tankWithDps = N === 2 ? ms.filter((m) => m !== t).every((m) => AP_DPS.includes(m.classId))
+                            : dpsCount >= Math.ceil((N - 2) / 2);
+    }
+
+    // --- party de 2: nunca 2 suportes/healers; suporte só com DPS; ou 2 SubDPS
+    let pairOK = true;
+    if (N === 2 && ms.length === 2) {
+      const sups = ms.filter((m) => AP_SUPPORT.includes(m.classId));
+      if (sups.length >= 2) pairOK = false;
+      else if (sups.length === 1 && !AP_DPS.includes(ms.find((m) => m !== sups[0]).classId)) pairOK = false;
+    }
+
+    // --- dependências de cooldown e de burst de atributo
+    const cdNeeded = any(AP_NEEDS_CD);
+    const cdOK = !cdNeeded || any(AP_CD_PRIORITY);
+    const burstDeps = ms.filter((m) => AP_NEEDS_BURST.includes(m.classId));
+    const burstNeeded = burstDeps.length > 0;
+    const burstOK = !burstNeeded || ms.some((m) => AP_BURST.includes(m.classId) && !burstDeps.every((d) => d === m));
+
+    const offCount = ms.filter((m) => m.gtype === "off").length;   // só existe no modo "relaxado"
+
+    // --- pontuação
+    let score = val - offCount * 1500;
+    score += healerOK ? 5000 : 0;
+    score += healerNative ? 300 : 0;                       // healer do elemento da party tem prioridade
+    score -= Math.max(0, healers - 1) * 800;               // só 1 healer
+    if (range) {
+      score += Math.min(carries, need) * 400 + Math.max(0, Math.min(carries, maxCarry) - need) * 40;
+      score -= Math.max(0, carries - maxCarry) * 1200;     // acima do teto (só ocorre nas passadas relaxadas)
+      if (carries >= 2 && mix) score += 350;               // mescla Unique + Legend
+    }
+    score += Math.min(eCount, minE) * 500;
+    if (N >= 6) score += Math.min(Math.max(eCount - minE, 0), 2) * 150;   // 5º e 6º do elemento
+    if (N === 2) { score += neutralPair ? 500 : 0; score += eCount >= 2 ? 100 : 0; }
+    if (N >= 6 && tankOK) score += 2500;
+    AP_CD_PRIORITY.forEach((id, i) => { if (has(id)) score += (AP_CD_PRIORITY.length - i) * 12; });
+    if (final) {
+      if (!tankWithDps) score -= 1500;
+      if (!pairOK) score -= 4000;
+      if (!cdOK) score -= 800;
+      if (!burstOK) score -= 800;
+    }
+    return { score, healerOK, healers, designated, healerNative, carries, need, maxCarry, hasU, hasL, mix,
+             eCount, minE, elementOK, neutralPair, tanks, tankOK, tankWithDps, pairOK,
+             cdNeeded, cdOK, burstNeeded, burstOK, offCount };
+  }
+
+  // Regras duras ao adicionar um personagem ao estado do beam. Devolve { guest, gtype } ou null.
+  function apTryAdd(st, c, E, N, ctx, relax, capOn) {
+    const g = apTryAddBase(st, c, E, N, ctx, relax);
+    if (g && capOn && !g.guest && c.carry) {
+      const range = AP_CARRY_RANGE[N];
+      if (range && (st.carryCount || 0) >= range[1]) return null;   // no máx. N carries na party
+    }
+    return g;
+  }
+  function apTryAddBase(st, c, E, N, ctx, relax) {
+    if (st.classes.includes(c.classId)) return null;                       // sem classes repetidas
+    if (AP_TANKS.includes(c.classId) && st.tanks >= 1) return null;        // no máx. 1 tank
+    if (N === 6 && AP_PURE_TANKS.includes(c.classId)) return null;         // party de 6: tank não pode ser só tanker
+    // Party de fogo: neutro que não seja suporte é proibido (vale também no modo relaxado)
+    if (AP_NEUTRAL.includes(c.classId) && !apNeutralAllowed(c.classId, E)) return null;
+    const slotClass = AP_SUPPORT_SLOT.includes(c.classId);
+    if (apFits(c.classId, E)) {
+      if (slotClass && st.ig > 0) return null;
+      return { guest: false, gtype: null };
+    }
+    // Fora do elemento:
+    // (a) healer: só se nenhum healer do elemento existe nos arquivos (prioridade do healer do elemento)
+    if (AP_HEALERS.includes(c.classId) && !ctx.nativeHealer[E] && st.fh < 1) return { guest: true, gtype: "healer" };
+    // (b) convidado Ice (Glaciana/Saint) ocupando a única vaga de suporte
+    if (AP_ICE_GUESTS.includes(c.classId) && E !== "ice" && st.ig < 1 && st.slotCount < 1) return { guest: true, gtype: "ice" };
+    // (c) suporte/cooldown de outro elemento completando a party
+    if (AP_FOREIGN_OK.includes(c.classId) && !AP_HEALERS.includes(c.classId) && !(slotClass && st.ig > 0)) return { guest: true, gtype: "support" };
+    // (d) sub-healer de outro elemento, apenas quando não há healer nenhum nos arquivos
+    if (AP_SUBHEALERS.includes(c.classId) && !ctx.trueHealer) return { guest: true, gtype: "support" };
+    // (e) modo relaxado: nenhuma party válida existe → aceita qualquer classe, com penalidade
+    if (relax) return { guest: true, gtype: "off" };
+    return null;
+  }
+
+  // Beam search: um personagem por arquivo (jogador).
+  // Assinatura de uma composição = classes usadas (a mesma chave que o beam usa para distinguir composições)
+  const apSig = (ms) => ms.map((m) => m.classId).sort().join(",");
+
+  function apPlanForElement(files, N, E, ctx, relax, capOn, exclude) {
+    let beam = [{ ms: [], classes: [], tanks: 0, fh: 0, ig: 0, slotCount: 0, carryCount: 0, score: 0 }];
+    for (let i = 0; i < N; i++) {
+      const final = i === N - 1;
+      const next = new Map();
+      for (const st of beam) {
+        for (const c of files[i]) {
+          const g = apTryAdd(st, c, E, N, ctx, relax, capOn);
+          if (!g) continue;
+          const ms = st.ms.concat({ ...c, file: i, guest: g.guest, gtype: g.gtype });
+          const ev = apEvaluate(ms, E, N, ctx, final);
+          const classes = st.classes.concat(c.classId);
+          const key = classes.slice().sort().join(",") + "|" + ev.carries + (ev.hasU ? "u" : "") + (ev.hasL ? "l" : "") + (ev.healerOK ? "h" : "");
+          const cur = next.get(key);
+          if (!cur || ev.score > cur.score) {
+            next.set(key, {
+              ms, classes, score: ev.score,
+              tanks: st.tanks + (AP_TANKS.includes(c.classId) ? 1 : 0),
+              fh: st.fh + (g.gtype === "healer" ? 1 : 0),
+              ig: st.ig + (g.gtype === "ice" ? 1 : 0),
+              slotCount: st.slotCount + (slotClassOf(c.classId) ? 1 : 0),
+              carryCount: st.carryCount + (!g.guest && c.carry ? 1 : 0)
+            });
+          }
+        }
+      }
+      beam = Array.from(next.values()).sort((a, b) => b.score - a.score).slice(0, N >= 8 ? 600 : AP_BEAM);
+      if (!beam.length) return null;
+    }
+    // beam já vem ordenado do melhor para o pior: pega a melhor que ainda não foi rejeitada
+    const top = beam.find((st) => !exclude || !exclude.has(apSig(st.ms)));
+    if (!top) return null;
+    const ev = apEvaluate(top.ms, E, N, ctx, true);
+    return { element: E, members: top.ms, eval: ev, score: ev.score, relaxed: !!relax };
+  }
+  const slotClassOf = (id) => AP_SUPPORT_SLOT.includes(id);
+
+  // Testa os 4 elementos-base e devolve a melhor party (ou null).
+  // 1ª passada: regras de elemento estritas. Se nenhuma party for possível, 2ª passada relaxada
+  // (classes de outro elemento entram com penalidade e aparecem como violação no resultado).
+  function apBuildBestParty(files, N, exclude) {
+    const ctx = apContext(files);
+    let best = null;
+    [[false, true], [false, false], [true, false]].forEach(([relax, capOn]) => {
+      if (best) return;
+      AP_ELEMENT_KEYS.forEach((E) => {
+        const plan = apPlanForElement(files, N, E, ctx, relax, capOn, exclude);
+        if (plan && (!best || plan.score > best.score)) best = plan;
+      });
+    });
+    if (best && best.eval.eCount === 0 && best.eval.neutralPair) best.element = "neutral";
+    return best;
+  }
+
+  function apRoleTags(m, ev) {
+    const tags = [];
+    if (AP_HEALERS.includes(m.classId)) tags.push("Healer");
+    else if (ev.designated === m) tags.push("Sub-Healer");
+    if (AP_TANKS.includes(m.classId)) tags.push("Tank");
+    if (AP_SUPPORT.includes(m.classId) && !AP_HEALERS.includes(m.classId) && !AP_TANKS.includes(m.classId)) tags.push("Support");
+    else if (AP_NEUTRAL_SUPPORT.includes(m.classId)) tags.push("Support");
+    if (m !== ev.designated && m.carry && !m.guest) tags.push("Carry");
+    if (AP_CD_PRIORITY.includes(m.classId)) tags.push("CD");
+    if (AP_BURST.includes(m.classId)) tags.push("Burst");
+    if (m.gtype === "off") tags.push("Off");
+    else if (m.guest) tags.push("Guest");
+    if (!tags.some((t) => ["Healer", "Sub-Healer", "Tank", "Support", "Carry"].includes(t))) tags.unshift(AP_DPS.includes(m.classId) ? "DPS" : "SubDPS");
+    return tags;
+  }
+  /* AP-LOGIC-END */
+
+  // ---------------------------------------------------------------- UI
+  const openBtn = document.getElementById("openAutoPartyBtn");
+  const overlay = document.getElementById("autoPartyOverlay");
+  if (!openBtn || !overlay) return;
+
+  const sideMenuOverlay = document.getElementById("sideMenuOverlay");
+  const closeBtn   = document.getElementById("closeAutoPartyBtn");
+  const typesEl    = document.getElementById("apTypes");
+  const contentSel = document.getElementById("apContent");
+  const filesEl    = document.getElementById("apFiles");
+  const genBtn     = document.getElementById("apGenerate");
+  const resetBtn   = document.getElementById("apReset");
+  const resultEl   = document.getElementById("apResult");
+  const historyEl  = document.getElementById("apHistory");
+  const histClearBtn = document.getElementById("apHistoryClear");
+  const onlineListEl = document.getElementById("apOnlineList");
+  const onlineCountEl = document.getElementById("apOnlineCount");
+  const onlineMsgEl = document.getElementById("apOnlineMsg");
+  const onlineOpenBtn = document.getElementById("apOnlineOpen");
+  const onlineStatusEl = document.getElementById("apOnlineStatus");
+  const invitePanel = document.getElementById("apInvitePanel");
+  const inviteCloseBtn = document.getElementById("apInviteClose");
+  const inviteBackdrop = document.getElementById("apInviteBackdrop");
+
+  const PARTY_SIZES = [2, 4, 6, 8];
+  // Conteúdos por tipo de party. Party-4 = todo o resto. As chaves são os títulos gravados nos backups
+  // (por isso "Typhoom Kim Hardcore" mantém a grafia do backup).
+  const AP_HIDDEN_CONTENTS = ["Missão diária", "Circus: Boss Rush", "Hero Battlefield", "Circus: Monastery"];
+  const AP_CONTENTS_BY_SIZE = {
+    2: ["Duel Dragon", "Dragon Fellowship"],
+    6: ["Typhoom Kim Hardcore", "Professor K Hardcore"],
+    8: ["Desert Dragon Hardcore", "Red Dragon Normal", "Red Dragon Hardcore", "Ice Dragon Normal"]
+  };
+  function apContentsFor(n) {
+    const fixed = AP_CONTENTS_BY_SIZE[n];
+    if (fixed) return ALL_CONTENTS.filter((t) => fixed.includes(t));
+    const taken = [].concat(...Object.values(AP_CONTENTS_BY_SIZE));
+    return ALL_CONTENTS.filter((t) => !AP_HIDDEN_CONTENTS.includes(t) && !taken.includes(t));
+  }
+  const HISTORY_KEY = "dnAutoPartyHistory";
+  let partySize = 4;
+  let contentTitle = "";
+  const slots = new Array(8).fill(null);   // { name, data, source? } por arquivo carregado (source = veio de um convite online)
+  const dirty = new Set();                 // arquivos marcados como concluídos e ainda não baixados
+  let lastPlan = null;                     // { plan, content, size, concluded }
+  // Personagens concluídos nesta sessão (chave: arquivo/pessoa + classe + nick + conteúdo). Garante que, mesmo que o
+  // arquivo seja carregado de novo ou a pessoa seja convidada de novo (dados "frescos" sem a marcação), quem já
+  // concluiu o conteúdo não volta a ser sugerido.
+  const concluded = new Set();
+  const slotKey = (s) => (s ? (s.source ? "on:" + s.source.pub : "f:" + s.name) : "");
+  const concludedKey = (s, ch, content) => slotKey(s) + "|" + (ch.classId || "") + "|" + (ch.nickname || "") + "|" + content;
+  const rejected = new Set();              // composições já mostradas e descartadas (para "Gerar" trazer outra)
+
+  // Convites online enviados por mim: pub do convidado -> { reqId, name, classId, status, timer, startedAt }
+  // status: "waiting" (aguardando) | "declined" | "expired" | "error"
+  const SHARE_URL = "/api/party-share";
+  const INVITE_POLL_MS = 2000;
+  const INVITE_TIMEOUT_MS = 125000;        // um pouco acima do TTL de 120s do servidor
+  const invites = new Map();
+
+  const T = (key, fb) => i18n(key, fb);
+  const EL_KEYS = { light: "apElLight", fire: "apElFire", dark: "apElDark", ice: "apElIce", neutral: "apElNeutral" };
+  const EL_FB = { light: "Light", fire: "Fire", dark: "Dark", ice: "Ice", neutral: "Neutro" };
+  const elLabel = (k) => T(EL_KEYS[k], EL_FB[k]);
+
+  // ---------------------------------------------------------------- histórico (só da sessão)
+  // O histórico vive apenas em memória: ao sair do site e entrar de novo ele começa zerado.
+  // A chave antiga do localStorage (versões anteriores salvavam lá) é apagada para não "voltar" do cache.
+  try { localStorage.removeItem(HISTORY_KEY); } catch (_) { /* sem storage */ }
+  let history = [];
+  function saveHistory() {
+    history = history.slice(0, 60);
+  }
+
+  // Rótulo Classe "nickname" (igual à tabela da tela inicial): classe com a fonte do título
+  // "Criador de Grupos" e nickname com a fonte dos botões.
+  function apNickLabel(clsName, nick) {
+    const wrap = document.createElement("span");
+    wrap.className = "ap-nick-label";
+    const c = document.createElement("span");
+    c.className = "ap-nick-class";
+    c.textContent = clsName;
+    wrap.appendChild(c);
+    if (nick) {
+      const n = document.createElement("span");
+      n.className = "ap-nick-name";
+      n.textContent = '"' + nick + '"';
+      wrap.appendChild(n);
+    }
+    wrap.title = nick ? clsName + ' "' + nick + '"' : clsName;
+    return wrap;
+  }
+
+  function renderHistory() {
+    historyEl.textContent = "";
+    histClearBtn.classList.toggle("hidden", !history.length);
+    if (!history.length) {
+      historyEl.appendChild(note(T("apHistoryEmpty", "Nenhuma party gerada ainda.")));
+      return;
+    }
+    history.forEach((h) => {
+      const row = document.createElement("div");
+      row.className = "ap-hist-item" + (h.done ? " done" : "");
+
+      const head = document.createElement("div");
+      head.className = "ap-hist-head";
+      const title = document.createElement("strong");
+      title.className = "ap-hist-title";
+      title.textContent = getContentLabel(h.content) + " · Party-" + h.size + " · " + elLabel(h.element);
+      const status = document.createElement("span");
+      status.className = "ap-hist-status " + (h.done ? "ok" : "pending");
+      status.textContent = h.done ? "✔ " + T("apDoneLabel", "Concluído") : "⏳ " + T("apPendingLabel", "Pendente");
+      const date = document.createElement("span");
+      date.className = "ap-hist-date";
+      date.textContent = new Date(h.done && h.doneAt ? h.doneAt : h.ts).toLocaleString();
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "ap-hist-del";
+      del.textContent = "✕";
+      del.title = T("compRemoveTitle", "Remover");
+      del.addEventListener("click", () => {
+        history = history.filter((x) => x.id !== h.id);
+        saveHistory(); renderHistory();
+      });
+      head.appendChild(title); head.appendChild(status); head.appendChild(date); head.appendChild(del);
+
+      const members = document.createElement("div");
+      members.className = "ap-hist-members";
+      h.members.forEach((m) => {
+        const cls = ALL_CLASSES.find((c) => c.id === m.classId);
+        const chip = document.createElement("span");
+        chip.className = "ap-hist-member";
+        const img = document.createElement("img");
+        img.src = "img/classes/" + m.classId + ".png";
+        img.alt = "";
+        img.onerror = () => { img.style.display = "none"; };
+        const txt = apNickLabel(cls ? getClassName(cls) : m.classId, m.nick);
+        chip.appendChild(img); chip.appendChild(txt);
+        members.appendChild(chip);
+      });
+
+      row.appendChild(head); row.appendChild(members);
+      historyEl.appendChild(row);
+    });
+  }
+
+  // ---------------------------------------------------------------- seleção de tipo / conteúdo / arquivos
+  function clearResult() { resultEl.textContent = ""; lastPlan = null; }
+
+  function renderTypes() {
+    typesEl.textContent = "";
+    PARTY_SIZES.forEach((n) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "ap-type-btn" + (n === partySize ? " active" : "");
+      b.textContent = "Party-" + n;
+      b.addEventListener("click", () => {
+        partySize = n;
+        if (!apContentsFor(n).includes(contentTitle)) contentTitle = "";   // conteúdo não existe neste tipo de party
+        rejected.clear(); clearResult(); renderTypes(); renderContentOptions(); renderFiles(); renderOnline();
+      });
+      typesEl.appendChild(b);
+    });
+  }
+
+  function renderContentOptions() {
+    contentSel.textContent = "";
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = T("apSelectContent", "Selecione o Conteúdo");
+    contentSel.appendChild(ph);
+    apContentsFor(partySize).forEach((title) => {
+      const o = document.createElement("option");
+      o.value = title;
+      o.textContent = getContentLabel(title);
+      contentSel.appendChild(o);
+    });
+    contentSel.value = contentTitle;
+  }
+
+  function renderFiles() {
+    filesEl.textContent = "";
+    for (let i = 0; i < partySize; i++) {
+      const box = document.createElement("div");
+      box.className = "ap-file" + (slots[i] ? " loaded" : "");
+      const lab = document.createElement("span");
+      lab.className = "ap-file-label";
+      lab.textContent = T("apFile", "Arquivo") + " " + (i + 1);
+      const pick = document.createElement("button");
+      pick.type = "button";
+      pick.className = "ap-file-btn";
+      pick.textContent = T("apChoose", "Escolher arquivo");
+      const info = document.createElement("span");
+      info.className = "ap-file-info";
+      if (slots[i]) {
+        info.textContent = slots[i].name + " · " + slots[i].data.characters.length + " " + T("apChars", "personagens")
+          + (slots[i].source ? " · " + T("apViaOnline", "online") : "")
+          + (dirty.has(i) ? " · " + T("apFileUpdated", "atualizado") : "");
+      }
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "application/json,.json";
+      input.className = "hidden";
+      pick.addEventListener("click", () => input.click());
+      input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (!data || !Array.isArray(data.characters)) throw new Error("format");
+            slots[i] = { name: file.name, data };
+            dirty.delete(i);
+          } catch (_) {
+            slots[i] = null;
+            alert(T("apBadFile", "Arquivo inválido") + ": " + file.name);
+          }
+          rejected.clear(); clearResult(); updateDl(); renderFiles(); renderOnline();
+        };
+        reader.readAsText(file);
+      });
+      box.appendChild(lab);
+      box.appendChild(pick);
+      if (slots[i]) {
+        const clr = document.createElement("button");
+        clr.type = "button";
+        clr.className = "ap-file-clear";
+        clr.textContent = "✕";
+        clr.title = T("apClearSlot", "Remover");
+        clr.addEventListener("click", () => {
+          if (dirty.has(i) && !confirm(T("apResetConfirm", "Há arquivos atualizados que ainda não foram baixados. Limpar mesmo assim?"))) return;
+          slots[i] = null; dirty.delete(i);
+          rejected.clear(); clearResult(); updateDl(); renderFiles(); renderOnline();
+        });
+        box.appendChild(clr);
+      }
+      box.appendChild(info);
+      box.appendChild(input);
+      filesEl.appendChild(box);
+    }
+  }
+
+  function note(text, cls) {
+    const p = document.createElement("p");
+    p.className = "ap-note " + (cls || "");
+    p.textContent = text;
+    return p;
+  }
+
+  // ---------------------------------------------------------------- baixar arquivos atualizados
+  const dlBtn = document.createElement("button");
+  dlBtn.type = "button";
+  dlBtn.className = "side-menu-item hidden";
+  genBtn.parentElement.appendChild(dlBtn);
+
+  function updateDl() {
+    dlBtn.classList.toggle("hidden", dirty.size === 0);
+    dlBtn.textContent = "⭳ " + T("apDownload", "Baixar arquivos atualizados") + " (" + dirty.size + ")";
+  }
+  dlBtn.addEventListener("click", () => {
+    Array.from(dirty).forEach((i, n) => {
+      const s = slots[i];
+      if (!s) return;
+      setTimeout(() => {
+        const blob = new Blob([JSON.stringify(s.data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = s.name.replace(/\.json$/i, "") + "-atualizado.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }, n * 300);
+    });
+    dirty.clear();
+    updateDl();
+    renderFiles();
+  });
+
+  // ---------------------------------------------------------------- gerar
+  function generate() {
+    // Party anterior ainda pendente = usuário não gostou: descarta e traz a próxima melhor composição diferente
+    if (lastPlan && !lastPlan.concluded) rejected.add(apSig(lastPlan.plan.members));
+    clearResult();
+    const ready = contentTitle && slots.slice(0, partySize).every(Boolean);
+    if (!ready) { resultEl.appendChild(note(T("apMissing", "Escolha o conteúdo e carregue todos os arquivos."), "warn")); return; }
+
+    const files = [];
+    let empty = false;
+    for (let i = 0; i < partySize; i++) {
+      const sl = slots[i];
+      const c = apCandidates(sl.data, contentTitle, (ch) => concluded.has(concludedKey(sl, ch, contentTitle)));
+      files.push(c);
+      if (!c.length) {
+        empty = true;
+        resultEl.appendChild(note(T("apFile", "Arquivo") + " " + (i + 1) + " (" + slots[i].name + "): " + T("apNoPending", "sem personagem pendente neste conteúdo"), "warn"));
+      }
+    }
+    if (empty) return;
+
+    let plan = apBuildBestParty(files, partySize, rejected);
+    if (!plan && rejected.size) {
+      // acabaram as combinações diferentes: recomeça pela melhor
+      rejected.clear();
+      plan = apBuildBestParty(files, partySize);
+      if (plan) resultEl.appendChild(note(T("apNoMore", "Não há mais combinações diferentes: recomeçando pela melhor.")));
+    }
+    if (!plan) { resultEl.appendChild(note(T("apNoResult", "Não foi possível formar uma party com esses arquivos."), "warn")); return; }
+    plan.attempt = rejected.size + 1;
+
+    // Gerar não entra no histórico: só o conteúdo concluído é contabilizado (ver concludeCurrent)
+    lastPlan = { plan, content: contentTitle, size: partySize, concluded: false };
+    renderResult(plan);
+  }
+
+  // ---------------------------------------------------------------- concluir conteúdo
+  function concludeCurrent() {
+    if (!lastPlan || lastPlan.concluded) return;
+    const { plan, content, size } = lastPlan;
+    plan.members.forEach((m) => {
+      const s = slots[m.file];
+      const chr = s && s.data.characters[m.idx];
+      const e = chr && chr.contents && chr.contents[m.ei];
+      if (e && e.title === content) {
+        e.done = true;
+        s.data.savedAt = Date.now();   // evita que o reset semanal do import "desfaça" a marcação
+        concluded.add(concludedKey(s, chr, content));
+        dirty.add(m.file);
+      }
+    });
+    lastPlan.concluded = true;
+    rejected.clear();   // os arquivos mudaram (personagens concluídos): próxima party parte do zero
+    // histórico: só entra quando o conteúdo é concluído
+    const now = Date.now();
+    history.unshift({
+      id: now + "-" + Math.random().toString(36).slice(2, 7),
+      ts: now, doneAt: now, content, size, element: plan.element, done: true,
+      members: plan.members.slice().sort((a, b) => a.file - b.file).map((m) => ({ classId: m.classId, nick: m.nick, file: m.file }))
+    });
+    saveHistory(); renderHistory(); renderFiles(); updateDl();
+    const row = resultEl.querySelector(".ap-done-row");
+    if (row) {
+      row.textContent = "";
+      row.appendChild(note("✔ " + T("apDoneMsg", "Conteúdo concluído nos arquivos. Gere uma nova party com os personagens restantes ou baixe os arquivos atualizados.")));
+    }
+  }
+
+  // ---------------------------------------------------------------- resultado
+  function renderResult(plan) {
+    const ev = plan.eval;
+    const N = partySize;
+    const h = document.createElement("h4");
+    h.className = "ap-result-title";
+    h.textContent = T("apResult", "Melhor composição") + " · " + T("apElement", "Elemento da party") + ": " + elLabel(plan.element)
+      + (plan.attempt > 1 ? " · " + T("apAlternative", "Alternativa") + " " + plan.attempt : "");
+    resultEl.appendChild(h);
+
+    // Classes em 2 colunas (Arquivo 1 | Arquivo 2, Arquivo 3 | Arquivo 4, ...), para party de 2/4/6/8
+    const membersGrid = document.createElement("div");
+    membersGrid.className = "ap-members";
+    resultEl.appendChild(membersGrid);
+
+    plan.members.slice().sort((a, b) => a.file - b.file).forEach((m) => {
+      const cls = ALL_CLASSES.find((c) => c.id === m.classId);
+      const row = document.createElement("div");
+      row.className = "ap-member";
+      const img = document.createElement("img");
+      img.src = "img/classes/" + m.classId + ".png";
+      img.alt = "";
+      img.onerror = () => { img.style.visibility = "hidden"; };
+      const who = document.createElement("div");
+      who.className = "ap-member-who";
+      const name = apNickLabel(cls ? getClassName(cls) : m.classId, m.nick);
+      const gear = document.createElement("span");
+      gear.className = "ap-member-gear";
+      gear.textContent = "Set: " + (m.setText || "—") + " · " + (m.weaponText || "—");
+      who.appendChild(name);
+      who.appendChild(gear);
+      const file = document.createElement("span");
+      file.className = "ap-member-file";
+      file.textContent = T("apFile", "Arquivo") + " " + (m.file + 1);
+      const tags = document.createElement("div");
+      tags.className = "ap-tags";
+      apRoleTags(m, ev).forEach((t) => {
+        const s = document.createElement("span");
+        s.className = "ap-tag ap-tag-" + t.toLowerCase().replace("-", "");
+        s.textContent = t;
+        tags.appendChild(s);
+      });
+      row.appendChild(img); row.appendChild(who); row.appendChild(tags); row.appendChild(file);
+      membersGrid.appendChild(row);
+    });
+
+    // ---- checklist das regras
+    const checks = [];
+    checks.push([ev.healerOK && ev.healers <= 1,
+      T("apRuleHealer", "1 healer") + (ev.designated ? " — " + T("apRuleSubHealer", "sub-healer (nenhum healer disponível nos arquivos)") : "")]);
+    if (N >= 4) {
+      checks.push([ev.carries >= ev.need && ev.carries <= ev.maxCarry, T("apRuleCarry", "Carries com set Unique/Legend") + " (" + ev.carries + " · " + ev.need + "–" + ev.maxCarry + ")"]);
+      checks.push([ev.carries < 2 || ev.mix, T("apRuleMix", "Carries mesclando Unique e Legend")]);
+    }
+    const minTxt = N >= 6 ? "mín. " + ev.minE + ", ideal 5–6" : "mín. " + ev.minE;
+    checks.push([ev.elementOK, ev.neutralPair
+      ? T("apRuleNeutralPair", "2 classes neutras")
+      : T("apRuleElement", "Classes do elemento") + " (" + ev.eCount + " · " + minTxt + ")"]);
+    if (N >= 6) checks.push([ev.tankOK, N === 8
+      ? T("apRuleTank8", "1 tank")
+      : T("apRuleTank6", "1 tank DPS/SubDPS (Crusader ou Defensio)")]);
+    if (ev.tanks > 0) checks.push([ev.tankWithDps, T("apRuleTankDps", "Tank acompanhado de DPS")]);
+    if (N === 2) checks.push([ev.pairOK, T("apRulePair", "Sem 2 suportes/healers — suporte junto de DPS")]);
+    if (ev.cdNeeded) checks.push([ev.cdOK, T("apRuleCd", "Sentinel/Gear Master/Moonlord com classe de cooldown")]);
+    if (ev.burstNeeded) checks.push([ev.burstOK, T("apRuleBurst", "Barbarian/Moonlord/Sniper/Crusader com classe de burst")]);
+    if (ev.offCount > 0) checks.push([false, T("apRuleOff", "Sem classes de outro elemento") + " (" + ev.offCount + ")"]);
+    checks.push([true, T("apRuleTank", "Máx. 1 tank") + " · " + T("apRuleDup", "Sem classes repetidas")]);
+
+    const list = document.createElement("ul");
+    list.className = "ap-checks";
+    checks.forEach(([ok, text]) => {
+      const li = document.createElement("li");
+      li.className = ok ? "ok" : "bad";
+      li.textContent = (ok ? "✔ " : "✖ ") + text;
+      list.appendChild(li);
+    });
+
+    // ---- botão de conteúdo concluído
+    const doneRow = document.createElement("div");
+    doneRow.className = "ap-done-row";
+    const doneBtn = document.createElement("button");
+    doneBtn.type = "button";
+    doneBtn.className = "side-menu-item ap-done-btn";
+    doneBtn.textContent = "✔ " + T("apMarkDone", "Conteúdo concluído");
+    doneBtn.addEventListener("click", concludeCurrent);
+    doneRow.appendChild(doneBtn);
+
+    // Regras à esquerda e botão à direita, na mesma grade de 2 colunas dos arquivos:
+    // o botão fica na coluna do Arquivo 2/4 (canto direito), ao lado do checklist.
+    const bottom = document.createElement("div");
+    bottom.className = "ap-bottom";
+    bottom.appendChild(list);
+    bottom.appendChild(doneRow);
+    resultEl.appendChild(bottom);
+  }
+
+  // ---------------------------------------------------------------- convite online
+  let onlineMsgTimer = null;
+  function onlineMsg(text) {
+    if (!onlineMsgEl) return;
+    onlineMsgEl.textContent = text || "";
+    clearTimeout(onlineMsgTimer);
+    if (text) onlineMsgTimer = setTimeout(() => { onlineMsgEl.textContent = ""; }, 7000);
+  }
+
+  // Arquivo (dentro do tipo de party atual) que já foi preenchido por essa pessoa, ou -1
+  function slotOf(pub) {
+    for (let i = 0; i < partySize; i++) if (slots[i] && slots[i].source && slots[i].source.pub === pub) return i;
+    return -1;
+  }
+  function freeSlot() {
+    for (let i = 0; i < partySize; i++) if (!slots[i]) return i;
+    return -1;
+  }
+
+  // Janela de convite (entra da esquerda para a direita; fecha ao escolher alguém)
+  function openInvitePanel() {
+    if (!invitePanel) return;
+    renderOnline();
+    invitePanel.classList.add("open");
+    if (inviteBackdrop) inviteBackdrop.classList.add("open");
+    invitePanel.setAttribute("aria-hidden", "false");
+  }
+  function closeInvitePanel(instant) {
+    if (!invitePanel) return;
+    if (instant) { invitePanel.classList.add("no-anim"); if (inviteBackdrop) inviteBackdrop.classList.add("no-anim"); }
+    invitePanel.classList.remove("open");
+    if (inviteBackdrop) inviteBackdrop.classList.remove("open");
+    invitePanel.setAttribute("aria-hidden", "true");
+    if (onlineOpenBtn) onlineOpenBtn.blur();
+    if (instant) { void invitePanel.offsetWidth; invitePanel.classList.remove("no-anim"); if (inviteBackdrop) inviteBackdrop.classList.remove("no-anim"); }
+  }
+  const invitePanelOpen = () => !!invitePanel && invitePanel.classList.contains("open");
+
+  // Resumo dos convites na tela da party (a lista fica na janela, que fecha ao convidar)
+  function renderInviteStatus() {
+    if (!onlineStatusEl) return;
+    onlineStatusEl.textContent = "";
+    invites.forEach((st) => {
+      const key = st.status === "waiting" ? ["apInviteWaiting", "Aguardando…", "wait"]
+        : st.status === "declined" ? ["apInviteDeclined", "Recusou", "bad"]
+        : st.status === "expired" ? ["apInviteExpired", "Sem resposta", "bad"]
+        : st.status === "error" ? ["apInviteError", "Falhou", "bad"] : null;
+      if (!key) return;
+      const line = document.createElement("div");
+      line.className = "ap-online-status " + key[2];
+      line.textContent = st.name + " — " + T(key[0], key[1]);
+      onlineStatusEl.appendChild(line);
+    });
+  }
+
+  function renderOnline() {
+    renderInviteStatus();
+    if (!onlineListEl) return;
+    const keep = onlineListEl.scrollTop;
+    onlineListEl.textContent = "";
+    const live = typeof window.isPresenceLive === "function" && window.isPresenceLive();
+    const users = ((typeof window.getOnlineUsers === "function" && window.getOnlineUsers()) || []).slice();
+    // convite em andamento continua visível mesmo se a pessoa sumiu da lista por um instante
+    invites.forEach((st, pub) => {
+      if (st.status === "waiting" && !users.some((u) => u.pub === pub)) users.push({ pub, name: st.name, classId: st.classId });
+    });
+    onlineCountEl.textContent = live && users.length ? "(" + users.length + ")" : "";
+
+    if (!live && !users.length) {
+      const localMode = typeof window.isLocalMode === "function" && window.isLocalMode();
+      onlineListEl.appendChild(note(localMode
+        ? T("apOnlineLocal", "Modo local: os convites só funcionam no site publicado ou com \"netlify dev\".")
+        : T("apOnlineOffline", "Convites indisponíveis: não foi possível falar com o servidor."))); return; }
+    if (!users.length) { onlineListEl.appendChild(note(T("apOnlineEmpty", "Ninguém online com personagens no momento."))); return; }
+
+    users.forEach((u) => {
+      const st = invites.get(u.pub);
+      const waiting = st && st.status === "waiting";
+      const loaded = slotOf(u.pub);
+
+      const row = document.createElement("div");
+      row.className = "ap-online-item";
+      const img = document.createElement("img");
+      img.src = "img/classes/" + encodeURIComponent(u.classId || "") + ".png";
+      img.alt = "";
+      img.onerror = () => { img.style.visibility = "hidden"; };
+      const name = document.createElement("span");
+      name.className = "ap-online-name";
+      name.textContent = u.name;
+      name.title = u.name;
+      const status = document.createElement("span");
+      status.className = "ap-online-status";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ap-file-btn";
+
+      if (waiting) {
+        status.textContent = T("apInviteWaiting", "Aguardando…");
+        status.classList.add("wait");
+        btn.textContent = T("apInviteCancel", "Cancelar");
+        btn.addEventListener("click", () => cancelInvite(u.pub));
+      } else {
+        if (st && st.status === "declined") { status.textContent = T("apInviteDeclined", "Recusou"); status.classList.add("bad"); }
+        else if (st && st.status === "expired") { status.textContent = T("apInviteExpired", "Sem resposta"); status.classList.add("bad"); }
+        else if (st && st.status === "error") { status.textContent = T("apInviteError", "Falhou"); status.classList.add("bad"); }
+        else if (loaded >= 0) { status.textContent = "✔ " + T("apFile", "Arquivo") + " " + (loaded + 1); status.classList.add("ok"); }
+        btn.textContent = T("apInvite", "Convidar");
+        btn.addEventListener("click", () => { btn.blur(); closeInvitePanel(); inviteUser(u); });
+      }
+      row.appendChild(img); row.appendChild(name); row.appendChild(status); row.appendChild(btn);
+      onlineListEl.appendChild(row);
+    });
+    onlineListEl.scrollTop = keep;
+  }
+
+  function stopInvite(pub) {
+    const st = invites.get(pub);
+    if (!st) return null;
+    clearTimeout(st.timer);
+    invites.delete(pub);
+    return st;
+  }
+
+  function cancelRemote(pub, reqId) {
+    if (!reqId) return;
+    fetch(SHARE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel", id: window.dnDeviceId, to: pub, reqId })
+    }).catch(() => {});
+  }
+
+  function cancelInvite(pub) {
+    const st = stopInvite(pub);
+    if (st) cancelRemote(pub, st.reqId);
+    renderOnline();
+  }
+  function cancelAllInvites() {
+    Array.from(invites.keys()).forEach((pub) => { const st = stopInvite(pub); if (st) cancelRemote(pub, st.reqId); });
+  }
+
+  async function inviteUser(u) {
+    const cur = invites.get(u.pub);
+    if (cur && cur.status === "waiting") return;
+    if (slotOf(u.pub) < 0 && freeSlot() < 0) {
+      onlineMsg(T("apInviteFull", "Todos os arquivos já estão preenchidos. Remova um (✕) para convidar."));
+      return;
+    }
+    onlineMsg("");
+    const st = { reqId: null, name: u.name, classId: u.classId, status: "waiting", timer: null, startedAt: Date.now() };
+    invites.set(u.pub, st);
+    renderOnline();
+    try {
+      const res = await fetch(SHARE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "invite", id: window.dnDeviceId, to: u.pub })
+      });
+      const j = await res.json().catch(() => ({}));
+      if (invites.get(u.pub) !== st) { if (j.reqId) cancelRemote(u.pub, j.reqId); return; }   // cancelado enquanto enviava
+      if (!res.ok || !j.reqId) {
+        invites.delete(u.pub);
+        if (j.error === "no_name") onlineMsg(T("apNeedChar", "Adicione uma classe à tabela primeiro: o nickname dela identifica você no convite."));
+        else if (j.error === "busy") onlineMsg(T("apInviteBusy", "Essa pessoa já tem convites pendentes. Tente de novo em instantes."));
+        else { invites.set(u.pub, Object.assign(st, { status: "error" })); }
+        renderOnline();
+        return;
+      }
+      st.reqId = j.reqId;
+      st.startedAt = Date.now();
+      pollInvite(u.pub, st);
+    } catch (_) {
+      if (invites.get(u.pub) === st) { st.status = "error"; renderOnline(); }
+    }
+  }
+
+  function pollInvite(pub, st) {
+    const tick = async () => {
+      if (invites.get(pub) !== st || st.status !== "waiting") return;
+      if (Date.now() - st.startedAt > INVITE_TIMEOUT_MS) {
+        st.status = "expired"; cancelRemote(pub, st.reqId); renderOnline(); return;
+      }
+      try {
+        const res = await fetch(SHARE_URL + "?req=" + encodeURIComponent(st.reqId) + "&to=" + encodeURIComponent(pub)
+          + "&id=" + encodeURIComponent(window.dnDeviceId), { cache: "no-store" });
+        const j = await res.json();
+        if (invites.get(pub) !== st) return;   // cancelado durante a requisição
+        if (j.status === "accepted") { receiveShared(pub, st, j.data); return; }
+        if (j.status === "declined") { st.status = "declined"; renderOnline(); return; }
+        if (j.status === "expired") { st.status = "expired"; renderOnline(); return; }
+      } catch (_) { /* falha de rede: tenta de novo até o tempo acabar */ }
+      st.timer = setTimeout(tick, INVITE_POLL_MS);
+    };
+    st.timer = setTimeout(tick, INVITE_POLL_MS);
+  }
+
+  // Dados chegaram: entram no mesmo slot que um arquivo escolhido à mão ocuparia.
+  function receiveShared(pub, st, data) {
+    if (!data || !Array.isArray(data.characters)) { st.status = "error"; renderOnline(); return; }
+    let idx = slotOf(pub);                    // convidar de novo a mesma pessoa atualiza o arquivo dela
+    if (idx < 0) idx = freeSlot();
+    if (idx < 0) {                            // todos ocupados enquanto esperava a resposta
+      stopInvite(pub);
+      onlineMsg(T("apInviteFull", "Todos os arquivos já estão preenchidos. Remova um (✕) para convidar."));
+      renderOnline();
+      return;
+    }
+    stopInvite(pub);
+    slots[idx] = { name: st.name, data, source: { pub, name: st.name } };
+    dirty.delete(idx);
+    rejected.clear(); clearResult(); updateDl(); renderFiles(); renderOnline();
+    if (typeof window.showToast === "function") {
+      window.showToast(T("apLoadedToast", "📥 {name} carregado no Arquivo {n}").replace("{name}", st.name).replace("{n}", idx + 1));
+    }
+  }
+
+  window.addEventListener("dn:online-users", () => { if (!overlay.classList.contains("hidden")) renderOnline(); });
+
+  function renderAll() { renderTypes(); renderContentOptions(); renderFiles(); renderOnline(); renderHistory(); updateDl(); }
+
+  contentSel.addEventListener("change", () => { contentTitle = contentSel.value; rejected.clear(); clearResult(); });
+  genBtn.addEventListener("click", generate);
+  if (onlineOpenBtn) onlineOpenBtn.addEventListener("click", () => { onlineOpenBtn.blur(); openInvitePanel(); });
+  if (inviteCloseBtn) inviteCloseBtn.addEventListener("click", () => closeInvitePanel());
+  if (inviteBackdrop) inviteBackdrop.addEventListener("click", () => closeInvitePanel());
+  resetBtn.addEventListener("click", () => {
+    if (dirty.size && !confirm(T("apResetConfirm", "Há arquivos atualizados que ainda não foram baixados. Limpar mesmo assim?"))) return;
+    cancelAllInvites(); invites.clear(); onlineMsg("");
+    slots.fill(null); dirty.clear(); contentTitle = ""; rejected.clear(); clearResult(); renderAll();
+  });
+  histClearBtn.addEventListener("click", () => {
+    if (!confirm(T("apHistoryClearConfirm", "Apagar todo o histórico de parties?"))) return;
+    history = []; saveHistory(); renderHistory();
+  });
+
+  openBtn.addEventListener("click", () => {
+    if (sideMenuOverlay) sideMenuOverlay.classList.add("hidden");
+    closeInvitePanel(true);
+    overlay.classList.remove("hidden");
+    renderAll();
+  });
+  const close = () => { closeInvitePanel(true); overlay.classList.add("hidden"); };
+  closeBtn.addEventListener("click", close);
+  // clicar no fundo escuro fecha (inclui a folga entre o modal e o painel de histórico)
+  const layoutEl = document.getElementById("apLayout");
+  overlay.addEventListener("click", (e) => { if (e.target === overlay || e.target === layoutEl) close(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || overlay.classList.contains("hidden")) return;
+    if (invitePanelOpen()) closeInvitePanel(); else close();   // Esc fecha primeiro a janela de convite
+  });
+
+  // troca de idioma: refaz os textos dinâmicos (os estáticos usam data-i18n)
+  window.refreshAutoParty = () => { if (!overlay.classList.contains("hidden")) { renderAll(); clearResult(); } };
+})();

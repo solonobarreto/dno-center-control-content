@@ -1380,7 +1380,8 @@ td.col-content {
    depends on how wide the surrounding table/column is — it looks the same in
    "Coluna Normal" and "Coluna Especial". When the columns don't fit the cell, a
    horizontal scrollbar appears. */
-.content-chips-container {
+.content-chips-container,
+.event-chips-container {
   --chip-fs: 10px;
   --chip-w: 192px;           /* fixed width for ANY chip (normal or priority) — wide enough that every content name, in every supported language (incl. longer ones like "Ежедневное задание" or "Reset sa loob ng"), fits without being clipped */
   --chip-h: 16px;            /* height of one standard chip row */
@@ -1397,11 +1398,25 @@ td.col-content {
   box-sizing: content-box;
 }
 
-.content-chips-container::-webkit-scrollbar {
+/* Chips de evento são mais largos: meia coluna: 2 por linha; o "dd/mm/aaaa - Tempo restante: X dias Y horas" fica no mesmo chip */
+.event-chips-container {
+  --chip-w: 350px;   /* ~meia coluna (725px): 2 chips lado a lado na linha */
+}
+.event-chip .chip-sublabel {
+  flex-shrink: 0;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.content-chips-container::-webkit-scrollbar,
+.event-chips-container::-webkit-scrollbar {
   height: 2px;                /* thinner bar: less vertical space taken, less chance of cropping content */
 }
 
-.content-chips-container::-webkit-scrollbar-thumb {
+.content-chips-container::-webkit-scrollbar-thumb,
+.event-chips-container::-webkit-scrollbar-thumb {
   border-radius: 1px;         /* keeps it a flat, straight line even at this reduced height */
 }
 
@@ -1414,7 +1429,8 @@ td.col-content {
   width: var(--chip-w);      /* fixed width: identical in Coluna Normal and Coluna Especial */
 }
 
-.content-chip {
+.content-chip,
+.event-chip {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1432,7 +1448,8 @@ td.col-content {
   line-height: 1.2;
 }
 
-.content-chip.done {
+.content-chip.done,
+.event-chip.done {
   border-color: var(--success);
   background: rgba(0, 255, 136, 0.08);
   color: var(--success);
@@ -1479,7 +1496,8 @@ td.col-content {
   display: block;
 }
 
-.content-chip.done .chip-status {
+.content-chip.done .chip-status,
+.event-chip.done .chip-status {
   color: var(--success);
 }
 
@@ -2252,7 +2270,7 @@ td.col-content {
 
 /* Rótulo do grupo "Flex" (Buffs Flex / Debuffs Flex), inline na mesma
    linha da classe, logo após o último ícone de skill normal. Mesma
-   fonte/estilo do título "Criador de Composição" do modal
+   fonte/estilo do título "Criador de Composições" do modal
    (.guide-modal-header h3): Cinzel dourado com leve letter-spacing.
    line-height igual à altura do ícone de skill (26px) faz o box de texto
    ter a MESMA altura do ícone ao lado, então o align-items:center do pai
@@ -3253,7 +3271,8 @@ html.cs-on .cs-managed::-webkit-scrollbar {
 
 /* A scrollbar nativa reservava espaço embaixo dos chips; a personalizada fica por cima,
    então o espaço passa a ser reservado por padding (sempre, para todas as linhas ficarem iguais). */
-html.cs-on .content-chips-container.cs-managed {
+html.cs-on .content-chips-container.cs-managed,
+html.cs-on .event-chips-container.cs-managed {
   padding-bottom: 10px;
 }
 
@@ -3468,3 +3487,365 @@ body.col-special td.col-content {
   letter-spacing: 1px;
   text-transform: uppercase;
 }
+
+
+/* =========================================================
+   Coluna de conteúdo em duas faces (Class Content ⇄ Event Content)
+   A tecla ' liga/desliga a classe "events-view" no <html> e a coluna
+   gira em 3D como uma página; a coluna Class não se mexe.
+   ========================================================= */
+.content-flip {
+  position: relative;
+  perspective: 1600px;
+}
+
+.content-flip-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform 0.7s cubic-bezier(0.45, 0.05, 0.25, 1);
+}
+
+html.events-view .content-flip-inner {
+  transform: rotateY(180deg);
+}
+
+.content-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* O verso ocupa exatamente o mesmo espaço da frente (que define a altura da célula) */
+.content-face-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+/* Só a face visível recebe clique */
+html.events-view .content-face-front,
+html:not(.events-view) .content-face-back {
+  pointer-events: none;
+}
+
+
+
+/* Mensagem quando não há evento ocorrendo (verso da coluna de conteúdo) */
+.event-empty {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  min-height: 40px;
+  padding-left: 6px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-faint);
+}
+
+
+/* Link do patch no cabeçalho da coluna (modo Evento) */
+th.col-content .event-patch-link {
+  color: var(--accent-gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+th.col-content .event-patch-link:hover {
+  color: var(--accent-flame);
+}
+
+
+/* Cabeçalho da coluna: mesma virada 3D das células (usa .content-flip* + html.events-view) */
+th.col-content .th-flip {
+  display: block;
+}
+th.col-content .content-face {
+  display: block;
+}
+
+
+/* =========================================================
+   Criador de Grupos / Party Maker
+   ========================================================= */
+/* Layout: modal principal + painel lateral separado (histórico) lado a lado, mesma altura */
+.ap-layout {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 1120px;
+}
+.autoparty-modal { flex: 0 1 760px; min-width: 0; max-width: 760px; }
+
+/* Tamanho FIXO: o modal (e o painel de histórico ao lado) mantém sempre a altura da tela da
+   party de 8 — trocar Party-2/4/6/8 não muda mais a altura. O que passar disso rola por dentro. */
+:root { --ap-modal-height: min(88vh, 1300px); }
+.autoparty-modal,
+.ap-history-side { height: var(--ap-modal-height); max-height: var(--ap-modal-height); }
+
+/* Título com legenda ("Em fase de adaptação") logo abaixo */
+.ap-title-wrap { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ap-subtitle {
+  font-size: 10.5px;
+  line-height: 1.2;
+  font-style: italic;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+.ap-row { margin-bottom: 14px; }
+.ap-label {
+  display: block; margin-bottom: 6px; font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.ap-types { display: flex; gap: 8px; flex-wrap: wrap; }
+.ap-type-btn, .ap-file-btn {
+  background: var(--bg-inset); color: var(--text-primary);
+  border: 1px solid var(--border-ember-soft); border-radius: 4px;
+  padding: 6px 14px; font-size: 12px; cursor: pointer;
+}
+@media (hover: hover) { .ap-type-btn:hover, .ap-file-btn:hover { border-color: var(--accent-flame); } }
+.ap-type-btn.active { border-color: var(--accent-flame); color: var(--accent-flame); background: rgba(255, 199, 79, 0.10); }
+.ap-select {
+  width: 100%; background: var(--bg-inset); color: var(--text-primary);
+  border: 1px solid var(--border-ember-soft); border-radius: 4px; padding: 6px 8px; font-size: 12px;
+}
+.ap-files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.ap-file {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+  padding: 8px; border: 1px dashed var(--border-ember-soft); border-radius: 6px;
+}
+.ap-file.loaded { border-style: solid; border-color: var(--success); }
+.ap-file-label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+.ap-file-info { flex-basis: 100%; font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-actions { display: flex; gap: 8px; }
+.ap-actions .side-menu-item { text-align: center; justify-content: center; }
+.ap-result { margin-top: 16px; }
+.ap-result-title {
+  /* Mesma fonte/estilo do título "Criador de Grupos" (.guide-modal-header h3) */
+  margin: 0 0 8px;
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+  color: var(--accent-gold);
+}
+/* Classes da party em 2 colunas: 1 2 / 3 4 / 5 6 / 7 8 */
+.ap-members { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; }
+.ap-members .ap-member { margin-bottom: 0; flex-wrap: wrap; min-width: 0; }
+.ap-members .ap-member-who { flex: 1 1 0; overflow-wrap: anywhere; }
+.ap-members .ap-member-file { order: 2; }
+.ap-members .ap-tags { order: 3; flex: 1 1 100%; justify-content: flex-start; padding-left: 44px; }
+.ap-note { font-size: 12px; margin: 4px 0; color: var(--text-muted); }
+.ap-note.warn { color: var(--danger); }
+.ap-member {
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px; margin-bottom: 4px;
+  background: var(--bg-inset); border: 1px solid var(--border-ember-soft); border-radius: 6px;
+}
+.ap-member img { width: 34px; height: 34px; object-fit: contain; flex-shrink: 0; }
+.ap-member-who { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; font-size: 12px; }
+.ap-member-gear { font-size: 10px; color: var(--text-faint); }
+.ap-member-file { font-size: 10px; color: var(--text-faint); white-space: nowrap; }
+.ap-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.ap-tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: rgba(255, 199, 79, 0.14); color: var(--accent-gold); }
+.ap-tag-healer, .ap-tag-subhealer { background: rgba(0, 255, 136, 0.12); color: var(--success); }
+.ap-tag-tank { background: rgba(120, 160, 255, 0.16); color: #8fb0ff; }
+.ap-checks { list-style: none; padding: 0; margin: 10px 0 0; font-size: 12px; }
+.ap-checks li { margin: 2px 0; }
+.ap-checks li.ok { color: var(--success); }
+.ap-checks li.bad { color: var(--danger); }
+@media (max-width: 560px) { .ap-files { grid-template-columns: 1fr; } }
+
+/* Criador de Grupos — conclusão de conteúdo e histórico */
+.ap-tag-carry { background: rgba(255, 130, 60, 0.16); color: #ff9a5a; }
+.ap-tag-cd, .ap-tag-burst { background: rgba(180, 120, 255, 0.16); color: #c9a0ff; }
+.ap-tag-guest { background: rgba(160, 160, 160, 0.18); color: var(--text-muted); }
+.ap-tag-subdps { background: rgba(255, 199, 79, 0.10); color: var(--accent-gold); }
+.ap-done-row { margin-top: 12px; }
+/* Regras à esquerda, botão "Conteúdo concluído" no canto direito (coluna do Arquivo 2/4) */
+.ap-bottom { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; margin-top: 10px; }
+.ap-bottom .ap-checks { margin: 0; }
+.ap-bottom .ap-done-row { margin: 0; justify-self: end; text-align: right; }
+@media (max-width: 560px) { .ap-bottom { grid-template-columns: 1fr; } }
+.ap-done-btn { text-align: center; justify-content: center; border-color: var(--success); color: var(--success); }
+/* Histórico: painel lateral separado, à direita do modal */
+.ap-history-side {
+  flex: 0 0 340px;
+  width: 340px;
+  max-width: 340px;
+  transform: translateX(-24px);
+  animation: apSideIn 0.35s ease 0.12s forwards;   /* surge de trás do modal principal */
+}
+@keyframes apSideIn {
+  from { transform: translateX(-24px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.ap-history-side .guide-modal-header { flex-wrap: wrap; gap: 8px; }
+.ap-history-side .guide-modal-header h3 { flex: 1 1 auto; min-width: 0; font-size: 0.95rem; }
+.ap-history-side .guide-modal-body { padding: 12px 14px; }
+.ap-history-list { display: flex; flex-direction: column; gap: 6px; }
+@media (prefers-reduced-motion: reduce) {
+  .ap-history-side { animation: none; opacity: 1; transform: none; }
+}
+/* Sem espaço lateral (telas estreitas): o histórico passa para baixo do modal */
+@media (max-width: 1140px) {
+  #autoPartyOverlay { align-items: flex-start; overflow-y: auto; }
+  .ap-layout { flex-direction: column; align-items: center; }
+  .autoparty-modal { flex: 0 0 auto; width: 100%; }
+  .ap-history-side { flex: 0 0 auto; width: 100%; max-width: 760px; height: auto; max-height: 50vh; transform: none; }
+}
+.ap-hist-item { padding: 6px 8px; background: var(--bg-inset); border: 1px solid var(--border-ember-soft); border-left: 3px solid var(--accent-gold); border-radius: 6px; }
+.ap-hist-item.done { border-left-color: var(--success); }
+.ap-hist-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
+.ap-hist-title { flex: 1 1 100%; min-width: 0; font-family: inherit; font-size: 11px; font-weight: 400; letter-spacing: 1px; text-transform: uppercase; }
+.ap-hist-status { font-size: 11px; }
+.ap-hist-status.ok { color: var(--success); }
+.ap-hist-status.pending { color: var(--accent-gold); }
+.ap-hist-date { font-size: 10px; color: var(--text-faint); }
+.ap-hist-del { margin-left: auto; background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 12px; padding: 0 2px; }
+.ap-hist-del:hover { color: var(--danger); }
+.ap-hist-members { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
+.ap-hist-member { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 11px; color: var(--text-muted); }
+.ap-hist-member img { width: 18px; height: 18px; object-fit: contain; }
+
+/* Criador de Grupos — convite online (importar dados de quem está online, sem arquivo) */
+.ap-online-count { color: var(--accent-gold); letter-spacing: 0; }
+.ap-online-list {
+  height: 118px;                       /* altura fixa: não muda com a quantidade de pessoas online */
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 6px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember-soft);
+  border-radius: 6px;
+}
+.ap-online-list .ap-note { margin: auto; text-align: center; }
+.ap-online-item { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 3px 6px; border-radius: 4px; font-size: 12px; }
+.ap-online-item:hover { background: rgba(255, 199, 79, 0.06); }
+.ap-online-item img { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
+.ap-online-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-online-status { font-size: 11px; white-space: nowrap; color: var(--text-faint); }
+.ap-online-status.ok   { color: var(--success); }
+.ap-online-status.bad  { color: var(--danger); }
+.ap-online-status.wait { color: var(--accent-gold); }
+.ap-online-item .ap-file-btn { padding: 3px 12px; font-size: 11px; }
+.ap-online-msg { min-height: 16px; margin-top: 4px; font-size: 11px; line-height: 1.3; color: var(--danger); }
+.ap-file-clear { margin-left: auto; background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 12px; padding: 0 2px; }
+.ap-file-clear:hover { color: var(--danger); }
+
+/* Aviso de convite recebido (aparece em qualquer tela do app, acima dos modais) */
+.invite-host {
+  position: fixed; right: 18px; bottom: 18px; z-index: 30000;
+  display: flex; flex-direction: column; gap: 10px;
+  width: 340px; max-width: calc(100vw - 36px);
+}
+.invite-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-flame);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.85);
+  animation: inviteIn 0.25s ease;
+}
+@keyframes inviteIn { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.invite-head { display: flex; align-items: center; gap: 10px; }
+.invite-head img { width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+.invite-text { font-size: 12.5px; line-height: 1.4; color: var(--text-primary); }
+.invite-text strong { color: var(--accent-gold); }
+.invite-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.invite-btn {
+  background: var(--bg-inset); color: var(--text-primary);
+  border: 1px solid var(--border-ember-soft); border-radius: 4px;
+  padding: 5px 14px; font-size: 12px; cursor: pointer;
+}
+.invite-btn:hover:not(:disabled) { border-color: var(--accent-flame); }
+.invite-btn.accept { border-color: var(--success); color: var(--success); }
+.invite-btn:disabled { opacity: 0.5; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .invite-card { animation: none; } }
+
+/* Criador de Grupos — todos os botões com a mesma fonte/layout de letras do rótulo "Tipo de party" (.ap-label) */
+.ap-type-btn,
+.ap-file-btn,
+.ap-actions .side-menu-item,
+.ap-done-btn,
+.invite-btn {
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Classe "nickname" no Criador de Grupos (resultado e histórico): mesmo layout do rótulo da coluna Classe
+   da tabela (Saleana "Loretta"): classe em Cinzel dourado/negrito e nick em itálico entre aspas, na mesma linha.
+   Tamanho da classe = tamanho do título do histórico (11px). */
+.ap-nick-label { display: flex; align-items: baseline; justify-content: flex-start; gap: 3px; min-width: 0; overflow: hidden; }
+.ap-nick-class {
+  font-family: 'Cinzel', 'Segoe UI', serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--accent-gold);
+  text-shadow: 0 0 6px rgba(232, 179, 77, 0.25);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 0 1 auto; min-width: 0;
+}
+.ap-nick-name {
+  font-size: 10.5px;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 0 1 auto; min-width: 0;
+}
+
+/* Online agora: botão Convidar na tela da party + resumo dos convites */
+.ap-online-row .ap-file-btn { margin-right: 8px; }
+/* Rótulo "Online agora · importar sem arquivo": fonte menor e sem quebra de linha (encolhe junto com a largura da tela) */
+.ap-online-row > .ap-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;   /* rede de segurança para idiomas com texto mais longo */
+  font-size: clamp(7.5px, 2.4vw, 9.5px);
+  letter-spacing: 0.4px;
+}
+.ap-online-status-list { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.ap-online-status-list:empty { display: none; }
+
+/* Janela de convite: flutuante, vem da esquerda da tela até o centro (mesmo tipo de animação dos outros modais) */
+.ap-invite-backdrop {
+  display: none;
+  position: fixed; inset: 0; z-index: 5;
+  background: rgba(0, 0, 0, 0.45);
+}
+.ap-invite-backdrop.open { display: block; animation: apInviteFade 0.3s ease forwards; }
+.ap-invite-panel {
+  display: none;
+  position: fixed; z-index: 6;
+  top: 50%; left: 50%;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(70vh, 520px);
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--accent-flame);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.9);
+  transform: translate(-50%, -50%);
+}
+.ap-invite-panel.open { display: flex; animation: apInviteSlideIn 0.45s ease-out forwards; }
+@keyframes apInviteSlideIn {
+  from { transform: translate(calc(-50% - 100vw), -50%); opacity: 0; }
+  to   { transform: translate(-50%, -50%);               opacity: 1; }
+}
+@keyframes apInviteFade { from { opacity: 0; } to { opacity: 1; } }
+.ap-invite-panel .ap-online-list { height: auto; min-height: 140px; max-height: 50vh; }
+/* Título da janela "Online agora · importar sem arquivo": menor e sem quebra de linha */
+.ap-invite-panel .guide-modal-header h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;   /* rede de segurança para idiomas com texto mais longo */
+  font-size: clamp(0.62rem, 3.4vw, 0.78rem);
+  letter-spacing: 0.2px;
+}
+
+/* Botões do Criador de Grupos não ficam "acesos" depois de clicados (foco preso / hover preso em toque) */
+.ap-type-btn:focus:not(:focus-visible), .ap-file-btn:focus:not(:focus-visible) { outline: none; }
