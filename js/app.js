@@ -5126,20 +5126,43 @@ document.addEventListener("DOMContentLoaded", () => {
     URL.revokeObjectURL(url);
   }
 
+  let saving = false;      // trava: nunca dois saves gravando ao mesmo tempo
+  let savePending = false; // mudou enquanto gravava: roda de novo no fim
+
   async function autoSave() {
     if (!autoSaveEnabled) return;
-    const data = gatherExportData();
+    if (saving) { savePending = true; return; }
+    saving = true;
+    try {
+      await autoSaveOnce();
+    } finally {
+      saving = false;
+      if (savePending) { savePending = false; scheduleAutoSave(); }
+    }
+  }
+
+  async function autoSaveOnce() {
+    let data;
+    try {
+      data = typeof window.buildBackupData === "function" ? window.buildBackupData() : gatherExportData();
+    } catch (_) {
+      data = gatherExportData();
+    }
+    // A tabela não é guardada no navegador: ao abrir a página ela começa vazia. Sem esta trava, o primeiro
+    // auto-save gravava "0 personagens" POR CIMA do backup real (arquivo de ~1 KB). Tabela vazia nunca é gravada.
+    if (!data.characters || data.characters.length === 0) return;
     const jsonStr = JSON.stringify(data, null, 2);
 
     // Avoid redundant saves: skip if content hasn't changed since last save.
-    if (jsonStr === lastSavedHash) return;
+    const hashStr = JSON.stringify(Object.assign({}, data, { savedAt: 0 }));
+    if (hashStr === lastSavedHash) return;
 
     // Sem suporte à File System Access API: único caso em que o fallback de
     // download avulso faz sentido, pois não há como sobrescrever um arquivo
     // específico de jeito nenhum neste navegador.
     if (!supportsFsAccess) {
       legacyDownloadSave(jsonStr);
-      lastSavedHash = jsonStr;
+      lastSavedHash = hashStr;
       flashBtn();
       return;
     }
@@ -5150,7 +5173,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const writable = await handle.createWritable();
         await writable.write(jsonStr);
         await writable.close();
-        lastSavedHash = jsonStr;
+        lastSavedHash = hashStr;
         flashBtn();
       } catch (_) {
         // A escrita no arquivo/pasta escolhido falhou (arquivo movido/apagado,
