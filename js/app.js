@@ -4987,10 +4987,18 @@ document.addEventListener("DOMContentLoaded", () => {
   let lastSavedHash = null;
   let fileHandle = null; // FileSystemFileHandle cached in memory once obtained/loaded
 
+  // true = o auto-save está ligado mas o navegador ainda não liberou a escrita no arquivo (acontece sempre que a
+  // página é reaberta: a permissão do arquivo expira). Até um clique do usuário liberar, NADA é gravado.
+  let needsReconnect = false;
+  let reconnectAsking = false;
+
   function updateBtnState() {
     btn.setAttribute("aria-pressed", String(autoSaveEnabled));
     const label = btn.querySelector(".autosave-label");
-    if (autoSaveEnabled) {
+    if (autoSaveEnabled && needsReconnect) {
+      btn.title = "Auto-save: aguardando permissão — clique em qualquer lugar da página e permita a edição do arquivo";
+      if (label) label.textContent = "Auto ⚠";
+    } else if (autoSaveEnabled) {
       btn.title = supportsFsAccess
         ? "Auto-save: ativado — salva no arquivo escolhido a cada mudança"
         : "Auto-save: ativado — salva na pasta Downloads a cada mudança";
@@ -5168,14 +5176,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const handle = await getStoredHandle();
+    if (handle && !(await hasPermission(handle))) {
+      // Permissão expirou (página reaberta): o navegador só deixa pedir de novo com um clique do usuário.
+      if (!needsReconnect) {
+        needsReconnect = true;
+        updateBtnState();
+        if (window.showToast) window.showToast("⚠️ Auto-save pausado: clique em qualquer lugar e permita a edição do arquivo para voltar a salvar");
+      }
+      return;
+    }
     if (handle && (await hasPermission(handle))) {
+      if (needsReconnect) { needsReconnect = false; updateBtnState(); }
       try {
         const writable = await handle.createWritable();
         await writable.write(jsonStr);
         await writable.close();
         lastSavedHash = hashStr;
         flashBtn();
-      } catch (_) {
+      } catch (err) {
+        console.error("Auto-save: falha ao gravar", err);
         // A escrita no arquivo/pasta escolhido falhou (arquivo movido/apagado,
         // permissão perdida, etc). Antes, esse erro caía no download avulso —
         // que salva sempre na pasta Downloads padrão com um novo nome
@@ -5208,11 +5227,48 @@ document.addEventListener("DOMContentLoaded", () => {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["class", "data-gear", "data-account"]
+    characterData: true,
+    attributeFilter: ["class", "data-gear", "data-account", "data-nickname", "data-class-id"]
   });
+
+  // Reconexão: qualquer clique (gesto do usuário) pede a permissão de volta e grava o que ficou pendente.
+  async function tryReconnect() {
+    if (!autoSaveEnabled || !needsReconnect || reconnectAsking || !supportsFsAccess) return;
+    const handle = await getStoredHandle();
+    if (!handle) return;
+    reconnectAsking = true;
+    try {
+      const ok = await verifyPermissionWithPrompt(handle);
+      if (ok) {
+        needsReconnect = false;
+        lastSavedHash = null;
+        updateBtnState();
+        if (window.showToast) window.showToast("Auto-save reconectado");
+        scheduleAutoSave();
+      }
+    } finally {
+      reconnectAsking = false;
+    }
+  }
+  document.addEventListener("click", tryReconnect, true);
+  document.addEventListener("keydown", tryReconnect, true);
+
+  // Ao abrir a página já com o auto-save ligado, confere a permissão logo de cara para avisar.
+  if (autoSaveEnabled && supportsFsAccess) {
+    getStoredHandle().then(async (h) => {
+      if (!h) { needsReconnect = false; return; }
+      if (!(await hasPermission(h))) {
+        needsReconnect = true;
+        updateBtnState();
+        if (window.showToast) window.showToast("⚠️ Auto-save pausado: clique em qualquer lugar e permita a edição do arquivo");
+      }
+    });
+  }
 
   btn.addEventListener("click", async (e) => {
     e.stopPropagation();
+    // Ligado mas sem permissão (página reaberta): o clique no botão reconecta em vez de desligar.
+    if (autoSaveEnabled && needsReconnect) { await tryReconnect(); return; }
     const turningOn = !autoSaveEnabled;
 
     // Sem a File System Access API (ex.: Firefox) não há como sobrescrever um
