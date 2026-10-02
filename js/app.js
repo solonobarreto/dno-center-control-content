@@ -2872,6 +2872,12 @@ document.addEventListener("DOMContentLoaded", () => {
       // backface-visibility junto com a sombra; como essas duas já são neutralizadas acima, a sombra pode voltar.
       ".class-cell-wrapper{box-shadow:0 0 0 1px rgba(184,129,252,.18),0 0 8px 1px rgba(184,129,252,.45),0 0 16px 2px rgba(184,129,252,.22),inset 0 0 8px rgba(184,129,252,.18)!important;border:1px solid rgba(184,129,252,.55)!important;transform:none!important;filter:none!important}" +
       ".class-cell-wrapper img{display:block!important;opacity:1!important;visibility:visible!important}" +
+      // Botão "+": a cruz é desenhada com ::before/::after, e na clonagem do html-to-image ela saía duplicada
+      // (um "+" escuro deslocado por cima do outro). Durante a captura a cruz vira dois degradês no próprio fundo.
+      ".btn-add-content-mini::before,.btn-add-content-mini::after{content:none!important;display:none!important}" +
+      ".btn-add-content-mini{box-shadow:none!important;background-color:var(--accent-flame)!important;" +
+        "background-image:linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor)!important;" +
+        "background-size:8px 2px,2px 8px!important;background-position:center,center!important;background-repeat:no-repeat!important}" +
       (eventsView ? ".content-face-front{visibility:hidden!important}" : ".content-face-back{visibility:hidden!important}");
     document.head.appendChild(st);
     // Ícones/imagens do próprio site: troca o src por data URL (cache) ANTES de capturar e espera decodificar.

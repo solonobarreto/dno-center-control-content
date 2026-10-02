@@ -74,6 +74,10 @@ function todayKey(now) {
 // Mantenha estes helpers idênticos aos de party-share.mjs.
 const INVITE_TTL_MS = 120000;
 const NOTICE_TTL_MS = 3600000;   // igual ao de party-share.mjs
+// Identidade do "aparelho" para contagem: hash do IP (nunca guardamos o IP puro). Vários navegadores no
+// mesmo computador/rede têm ids diferentes no localStorage, mas o mesmo IP -> contam como 1 só.
+const devOf = (ip) =>
+  createHash("sha256").update("dn-origins-dev:" + ip).digest("hex").slice(0, 24);
 const pubOf = (id) =>
   createHash("sha256").update("dn-origins-presence:" + id).digest("hex").slice(0, 20);
 
@@ -146,6 +150,9 @@ export default async (req, context) => {
     try { body = await req.json(); } catch (_) {}
   }
 
+  const ip = (context && context.ip) || (req.headers.get("x-nf-client-connection-ip") || "");
+  const dev = ip ? devOf(ip) : "";
+
   const id = typeof body.id === "string" ? body.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) : "";
 
   // Geolocalização vem do context.geo da Netlify (resolvido a partir do IP
@@ -162,13 +169,15 @@ export default async (req, context) => {
         ts: now, region, country,
         name: sanitizeName(body.name),
         classId: sanitizeClassId(body.classId),
-        pub: pubOf(id)
+        pub: pubOf(id),
+        dev: dev || ("id:" + id)
       }));
 
       // Acessos totais + média diária + região/país: conta no máximo 1 acesso
       // por dispositivo por dia (dedupe via chave própria), então soma de
       // verdade entre TODOS os visitantes — não só o navegador de quem olha.
-      const visitKey = `visit:${id}:${today}`;
+      // Dedupe por IP (não por navegador): abrir o site em Chrome + Brave + Edge conta 1 acesso só.
+      const visitKey = `visit:${dev || id}:${today}`;
       const alreadyVisitedToday = await statsStore.get(visitKey);
       if (!alreadyVisitedToday) {
         await statsStore.set(visitKey, "1");
@@ -201,6 +210,7 @@ export default async (req, context) => {
   const regionCounts = {};
   const countryCounts = {}; // { region: { countryCode: count } }
   let aliveCount = 0;
+  const seenDev = new Set(); // 1 contagem por aparelho (IP), mesmo com vários navegadores abertos
   const onlineUsers = []; // { pub, name, classId } — só quem tem personagem na tabela
 
   await Promise.all(
@@ -219,10 +229,15 @@ export default async (req, context) => {
         await presenceStore.delete(key);
         return;
       }
-      aliveCount++;
+      // A lista de convites continua por sessão (cada navegador com personagens é uma pessoa convidável)...
       if (isObj && raw.pub && raw.name) {
         onlineUsers.push({ pub: raw.pub, name: raw.name, classId: raw.classId || "" });
       }
+      // ...mas o contador "online" e as regiões contam cada aparelho uma vez só.
+      const devKey = (isObj && raw.dev) || key;
+      if (seenDev.has(devKey)) return;
+      seenDev.add(devKey);
+      aliveCount++;
       regionCounts[region] = (regionCounts[region] || 0) + 1;
       countryCounts[region] = countryCounts[region] || {};
       countryCounts[region][country] = (countryCounts[region][country] || 0) + 1;
