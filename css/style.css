@@ -4,36 +4,36 @@
    ========================================================= */
 
 :root {
-  /* Base */
-  --bg-void: #0c0908;
-  --bg-panel: #17110d;
-  --bg-panel-alt: #1f1712;
-  --bg-inset: #0a0706;
+  /* Cores medidas nos prints do dnorigins.com */
+  --bg-void: #09090d;        /* fundo da página */
+  --bg-panel: #1d1d26;       /* cartões / containers */
+  --bg-panel-alt: #13131a;   /* cabeçalho, barras, botões */
+  --bg-inset: #0c0c10;       /* linhas de lista / áreas rebaixadas */
+  --bg-selected: #242430;    /* item selecionado / hover */
 
-  /* Ember / bronze borders */
-  --border-ember: #4a3018;
-  --border-ember-soft: #2c1f14;
+  --border-ember: #2c2c38;
+  --border-ember-soft: #212126;
 
-  /* Accents */
-  --accent-flame: #ff7b1c;
-  --accent-flame-soft: rgba(255, 123, 28, 0.35);
-  --accent-ember: #d43f1f;
-  --accent-gold: #e8b34d;
-  --accent-gold-soft: rgba(232, 179, 77, 0.35);
+  /* Violeta = aba ativa / seleção; âmbar = sublinhado de título e "LV" */
+  --accent-flame: #b881fc;
+  --accent-flame-soft: rgba(184, 129, 252, 0.30);
+  --accent-ember: #9d63ee;
+  --accent-gold: #f7a800;
+  --accent-gold-soft: rgba(247, 168, 0, 0.30);
 
-  /* Text */
-  --text-primary: #f3e6d3;
-  --text-muted: #b89a78;
-  --text-faint: #7d6a54;
+  --text-primary: #edeff5;
+  --text-muted: #a59fb0;
+  --text-faint: #6e6a7a;
 
-  /* Status */
-  --danger: #ff4d4d;
-  --success: #6be08a;
+  --danger: #e4454a;
+  --success: #2ea068;
 
-  /* Rarity */
   --rarity-epic: #ff9900;
   --rarity-unique: #bf5af2;
   --rarity-legend: #ff375f;
+
+  --font-ui: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --font-display: 'Cinzel', 'Segoe UI', serif;
 }
 
 * {
@@ -74,12 +74,10 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-ui);
   background-color: var(--bg-void);
   background-image:
-    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(255, 123, 28, 0.10), transparent 60%),
-    radial-gradient(ellipse 700px 400px at 100% 0%, rgba(212, 63, 31, 0.10), transparent 55%),
-    repeating-linear-gradient(135deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 26px);
+    radial-gradient(ellipse 900px 420px at 50% -15%, rgba(184, 129, 252, 0.07), transparent 65%);
   color: var(--text-primary);
   padding: 0.6rem 1rem;
   min-height: 100vh;
@@ -685,7 +683,7 @@ tr.drag-over-bottom td {
 /* Table currently under the dragged row (drop destination) */
 .table-container.drop-active {
   border-color: var(--accent-flame);
-  box-shadow: 0 0 0 1px var(--accent-flame), 0 0 18px rgba(255, 123, 28, 0.25), 0 10px 24px rgba(0,0,0,0.45);
+  box-shadow: 0 0 0 1px var(--accent-flame), 0 0 18px rgba(184, 129, 252, 0.25), 0 10px 24px rgba(0,0,0,0.45);
 }
 
 /* Keep the grabbing cursor everywhere while a row is being dragged */
@@ -888,7 +886,7 @@ td.col-content {
   border: 1px solid var(--border-ember-soft);
   border-radius: 6px;
   padding: 2px;
-  box-shadow: inset 0 0 6px rgba(255, 123, 28, 0.08);
+  box-shadow: inset 0 0 6px rgba(184, 129, 252, 0.08);
 }
 
 .class-cell-wrapper img {
@@ -925,7 +923,7 @@ td.col-content {
   font-weight: 700;
   letter-spacing: 0.2px;
   color: var(--accent-gold);
-  text-shadow: 0 0 6px rgba(232, 179, 77, 0.25);
+  text-shadow: 0 0 6px rgba(247, 168, 0, 0.25);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1451,7 +1449,7 @@ td.col-content {
 .content-chip.done,
 .event-chip.done {
   border-color: var(--success);
-  background: rgba(0, 255, 136, 0.08);
+  background: rgba(46, 160, 104, 0.08);
   color: var(--success);
 }
 
@@ -1536,7 +1534,7 @@ td.col-content {
   padding: 0 4px;
   margin-left: 2px;
   border-radius: 3px;
-  background: rgba(255, 199, 79, 0.12);
+  background: rgba(247, 168, 0, 0.12);
   color: var(--text-faint);
   font-size: 9px;
   letter-spacing: 0.2px;
@@ -1560,7 +1558,7 @@ td.col-content {
   padding: 0 4px;
   margin-left: 2px;
   border-radius: 3px;
-  background: rgba(255, 199, 79, 0.16);
+  background: rgba(247, 168, 0, 0.16);
   color: var(--accent-gold);
   font-size: 9px;
   font-weight: 700;
@@ -1633,7 +1631,7 @@ td.col-content {
 
 .account-id-popover .account-id-confirm:hover {
   border-color: var(--success);
-  background: rgba(0, 255, 136, 0.1);
+  background: rgba(46, 160, 104, 0.1);
 }
 
 .account-id-popover .account-id-error {
@@ -1836,8 +1834,8 @@ td.col-content {
   top: 0;
   left: 0;
   height: 100%;
-  width: 260px;
-  max-width: 82vw;
+  width: 300px;
+  max-width: 86vw;
   background: var(--bg-panel);
   border-right: 1px solid var(--accent-flame);
   box-shadow: 8px 0 30px rgba(0, 0, 0, 0.7);
@@ -1898,7 +1896,7 @@ td.col-content {
   display: flex;
   flex-direction: column;
   padding: 10px;
-  gap: 4px;
+  gap: 8px;
   overflow-y: auto;
   transition: transform 0.25s ease;
 }
@@ -1967,24 +1965,106 @@ td.col-content {
   color: var(--text-muted);
 }
 
+/* =========================================================
+   Cards do menu lateral: ícone em caixa, título em Cinzel (versalete)
+   e legenda curta explicando o que cada item faz.
+   ========================================================= */
+.side-menu-item.menu-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: 14px 14px 13px;
+  border-radius: 6px;
+  text-align: left;
+  flex-shrink: 0;
+}
+.menu-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-muted);
+  transition: color 0.2s, background 0.2s;
+}
+.menu-card-title {
+  margin-top: 14px;
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  text-transform: none;
+  line-height: 1.2;
+  color: var(--text-primary);
+  transition: color 0.2s;
+}
+.menu-card-desc {
+  margin-top: 4px;
+  font-family: var(--font-ui, 'Inter', sans-serif);
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  white-space: normal;
+}
+.side-menu-item.menu-card:hover .menu-card-icon { color: var(--accent-gold); background: rgba(247, 168, 0, 0.12); }
+.side-menu-item.menu-card:hover .menu-card-title { color: var(--accent-gold); }
+
+/* Item indisponível / em adaptação (ex.: Ice Dragon): borda tracejada e apagado */
+.side-menu-item.menu-card.menu-card-wip {
+  border-style: dashed;
+  background: rgba(0, 0, 0, 0.35);
+}
+.menu-card-wip .menu-card-icon { background: rgba(255, 255, 255, 0.04); color: var(--text-faint); }
+.menu-card-wip .menu-card-title,
+.menu-card-wip .menu-card-desc { color: var(--text-faint); }
+.side-menu-item.menu-card.menu-card-wip:hover { border-style: dashed; }
+
+@media (max-width: 480px) {
+  .side-menu-item.menu-card { padding: 11px 12px 10px; }
+  .menu-card-icon { width: 28px; height: 28px; }
+  .menu-card-title { margin-top: 9px; font-size: 0.9rem; }
+}
+
 .side-menu-item.lang-active {
   border-color: var(--accent-flame);
   color: var(--accent-flame);
   font-weight: 600;
 }
 
+/* Botão "‹ Voltar": mesmo estilo do título "‹ Composition Buffs by Class"
+   (Cinzel, 0.85rem, seta que desliza no hover, linha divisória embaixo). */
 .side-menu-back {
-  align-self: flex-start;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
   background: none;
   border: none;
-  color: var(--text-muted);
-  font-size: 12px;
+  border-bottom: 1px solid var(--border-ember-soft);
+  border-radius: 0;
+  font-family: var(--font-display, 'Cinzel', serif);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  text-transform: none;
+  color: var(--text-primary);
   cursor: var(--cursor-pointer);
-  padding: 4px 2px 10px;
+  user-select: none;
+  padding: 4px 2px 8px;
+  margin-bottom: 10px;
+  transition: color 0.15s;
 }
 
 .side-menu-back:hover {
-  color: var(--accent-gold);
+  color: var(--accent-flame);
+}
+.side-menu-back:hover .comp-panel-arrow {
+  transform: translateX(-3px);
+  opacity: 1;
 }
 
 /* =========================================================
@@ -2054,7 +2134,7 @@ td.col-content {
    Criador de Composições
    ========================================================= */
 .compmaker-modal {
-  max-width: 760px;
+  max-width: min(1000px, 96vw);
 }
 
 .compmaker-body {
@@ -2241,6 +2321,24 @@ td.col-content {
   padding: 4px 8px;
   font-size: 11px;
   color: var(--text-faint);
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Rótulo em uma linha só (sem quebra); reticências só como último recurso. */
+.comp-stat-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.comp-stat-value {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .comp-stat-cell { font-size: 10px; padding: 4px 6px; gap: 4px; }
 }
 
 .comp-stat-cell-active {
@@ -2328,7 +2426,7 @@ td.col-content {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--accent-gold);
-  text-shadow: 0 0 6px rgba(232, 179, 77, 0.25);
+  text-shadow: 0 0 6px rgba(247, 168, 0, 0.25);
   opacity: 0.85;
   flex: 0 0 auto;
   line-height: 26px;
@@ -2362,7 +2460,7 @@ td.col-content {
      preenchendo a caixa toda em vez de "encolher" o desenho pra caber. */
   object-fit: cover;
   border-radius: 5px;
-  border: 1px solid rgba(232, 179, 77, 0.25);
+  border: 1px solid rgba(247, 168, 0, 0.25);
   cursor: default;
 }
 
@@ -2386,7 +2484,7 @@ td.col-content {
   z-index: 20500; /* acima do .modal-overlay (20000) que o Composition Maker usa, senão fica escondido atrás do fundo escurecido do modal */
   pointer-events: none;
   background: var(--bg-panel, #1a1a1f);
-  border: 1px solid rgba(232, 179, 77, 0.4);
+  border: 1px solid rgba(247, 168, 0, 0.4);
   border-radius: 6px;
   padding: 4px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
@@ -2425,7 +2523,7 @@ td.col-content {
   height: 34px;
   object-fit: contain;
   border-radius: 5px;
-  border: 1px solid rgba(232, 179, 77, 0.6);
+  border: 1px solid rgba(247, 168, 0, 0.6);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   background: var(--bg-panel, #1a1a1f);
 }
@@ -2608,7 +2706,7 @@ td.col-content {
 }
 
 .tip-box {
-  background: rgba(255,123,28,0.08);
+  background: rgba(184, 129, 252, 0.08);
   border: 1px solid var(--accent-flame-soft);
   border-radius: 5px;
   padding: 8px 10px;
@@ -3096,7 +3194,7 @@ input:disabled {
 }
 
 .filter-section-head:hover {
-  background: rgba(255, 123, 28, 0.12);
+  background: rgba(184, 129, 252, 0.12);
 }
 
 .filter-chevron {
@@ -3133,7 +3231,7 @@ input:disabled {
 }
 
 .filter-option:hover {
-  background: rgba(255, 123, 28, 0.12);
+  background: rgba(184, 129, 252, 0.12);
   color: var(--accent-gold);
 }
 
@@ -3429,7 +3527,7 @@ html.js-cursor-on .class-nickname[contenteditable] {
 }
 
 .col-mode-option:hover {
-  background: rgba(255, 123, 28, 0.12);
+  background: rgba(184, 129, 252, 0.12);
   color: var(--accent-gold);
 }
 
@@ -3604,7 +3702,7 @@ th.col-content .content-face {
   padding: 6px 14px; font-size: 12px; cursor: pointer;
 }
 @media (hover: hover) { .ap-type-btn:hover, .ap-file-btn:hover { border-color: var(--accent-flame); } }
-.ap-type-btn.active { border-color: var(--accent-flame); color: var(--accent-flame); background: rgba(255, 199, 79, 0.10); }
+.ap-type-btn.active { border-color: var(--accent-flame); color: var(--accent-flame); background: rgba(247, 168, 0, 0.10); }
 .ap-select {
   width: 100%; background: var(--bg-inset); color: var(--text-primary);
   border: 1px solid var(--border-ember-soft); border-radius: 4px; padding: 6px 8px; font-size: 12px;
@@ -3645,8 +3743,8 @@ th.col-content .content-face {
 .ap-member-gear { font-size: 10px; color: var(--text-faint); }
 .ap-member-file { font-size: 10px; color: var(--text-faint); white-space: nowrap; }
 .ap-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-.ap-tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: rgba(255, 199, 79, 0.14); color: var(--accent-gold); }
-.ap-tag-healer, .ap-tag-subhealer { background: rgba(0, 255, 136, 0.12); color: var(--success); }
+.ap-tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: rgba(247, 168, 0, 0.14); color: var(--accent-gold); }
+.ap-tag-healer, .ap-tag-subhealer { background: rgba(46, 160, 104, 0.12); color: var(--success); }
 .ap-tag-tank { background: rgba(120, 160, 255, 0.16); color: #8fb0ff; }
 .ap-checks { list-style: none; padding: 0; margin: 10px 0 0; font-size: 12px; }
 .ap-checks li { margin: 2px 0; }
@@ -3658,7 +3756,7 @@ th.col-content .content-face {
 .ap-tag-carry { background: rgba(255, 130, 60, 0.16); color: #ff9a5a; }
 .ap-tag-cd, .ap-tag-burst { background: rgba(180, 120, 255, 0.16); color: #c9a0ff; }
 .ap-tag-guest { background: rgba(160, 160, 160, 0.18); color: var(--text-muted); }
-.ap-tag-subdps { background: rgba(255, 199, 79, 0.10); color: var(--accent-gold); }
+.ap-tag-subdps { background: rgba(247, 168, 0, 0.10); color: var(--accent-gold); }
 .ap-done-row { margin-top: 12px; }
 /* Regras à esquerda, botão "Conteúdo concluído" no canto direito (coluna do Arquivo 2/4) */
 .ap-bottom { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: start; margin-top: 10px; }
@@ -3719,7 +3817,7 @@ th.col-content .content-face {
 }
 .ap-online-list .ap-note { margin: auto; text-align: center; }
 .ap-online-item { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 3px 6px; border-radius: 4px; font-size: 12px; }
-.ap-online-item:hover { background: rgba(255, 199, 79, 0.06); }
+.ap-online-item:hover { background: rgba(247, 168, 0, 0.06); }
 .ap-online-item img { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
 .ap-online-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ap-online-status { font-size: 11px; white-space: nowrap; color: var(--text-faint); }
@@ -3784,7 +3882,7 @@ th.col-content .content-face {
   font-weight: 700;
   letter-spacing: 0.2px;
   color: var(--accent-gold);
-  text-shadow: 0 0 6px rgba(232, 179, 77, 0.25);
+  text-shadow: 0 0 6px rgba(247, 168, 0, 0.25);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   flex: 0 1 auto; min-width: 0;
 }
@@ -3850,3 +3948,570 @@ th.col-content .content-face {
 
 /* Botões do Criador de Grupos não ficam "acesos" depois de clicados (foco preso / hover preso em toque) */
 .ap-type-btn:focus:not(:focus-visible), .ap-file-btn:focus:not(:focus-visible) { outline: none; }
+
+
+/* =========================================================
+   Tema Dragon Nest Origins (site oficial) — camada final
+   Tipografia do site:
+   - Títulos e nomes ........ Cinzel, branco (#edeff5), sem caixa-alta forçada
+   - Rótulos / classes ...... Inter, MAIÚSCULAS, espaçamento largo, cinza (#a59fb0)
+   - Destaques (LV, traço) .. Inter/âmbar (#f7a800)
+   - Abas / botões .......... Inter 600, MAIÚSCULAS nas abas
+   - Sem itálico, sem brilho (text-shadow)
+   ========================================================= */
+
+.embers { display: none; }
+
+::-webkit-scrollbar-thumb { background: #34343f; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-flame); box-shadow: none; }
+* { scrollbar-color: #34343f transparent; }
+
+/* Cabeçalho sólido, igual ao do site */
+.header {
+  margin-left: -1rem; margin-right: -1rem;
+  padding-left: 1rem; padding-right: 1rem;
+  background: var(--bg-panel-alt);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  border-bottom: 1px solid var(--border-ember-soft);
+}
+
+/* ---------- Títulos: Cinzel branco + traço âmbar ---------- */
+.brand h1 {
+  font-family: var(--font-display);
+  font-weight: 600; font-size: 1.7rem;
+  text-transform: none; letter-spacing: 0.5px;
+  color: var(--text-primary); text-shadow: none;
+  position: relative; padding-bottom: 8px; margin-bottom: 4px;
+}
+.brand h1::after {
+  content: ""; position: absolute; left: 0; bottom: 0;
+  width: 56px; height: 2px; background: var(--accent-gold);
+}
+.brand h2 {                       /* "ORIGINS" do logo: Inter âmbar, tracking largo */
+  font-family: var(--font-ui);
+  font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase;
+  color: var(--accent-gold);
+}
+
+.region-panel-header,
+.manual-modal-header h3,
+.side-menu-title,
+.guide-modal-header h3,
+.comp-result-panel h4, .comp-slide-panel h4,
+.comp-class-buff-flex-label,
+.guide-spirit-card h4,
+.raid-section h4,
+.progression-heading,
+.leveling-range,
+.filter-section-head,
+.col-mode-title,
+.ap-result-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: 0.5px;
+  text-shadow: none;
+}
+.region-panel-header span { font-family: var(--font-display); color: var(--text-primary); }
+.raid-section h4 { border-left-color: var(--accent-gold); }
+.progression-heading { border-color: var(--border-ember); }
+
+/* ---------- Tabela: rótulo da classe (como "BARBARIAN" / "ZUDGE" no site) ---------- */
+.class-nickname-class,
+.ap-nick-class {                  /* classe: Inter, maiúsculas, cinza */
+  font-family: var(--font-ui);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  text-shadow: none;
+}
+.class-nickname-class { font-size: 0.6rem; }
+.ap-nick-class { font-size: 10px; }
+
+/* Nick/nome: mantido como era antes do tema (fonte Segoe UI, itálico, cinza) */
+.class-nickname-name,
+.ap-nick-name {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: normal;
+  color: var(--text-muted);
+}
+.class-nickname-name { font-size: 0.66rem; }
+.ap-nick-name { font-size: 10.5px; }
+.class-nickname.nick-long .class-nickname-class { font-size: 0.54rem; }
+.class-nickname.nick-long .class-nickname-name  { font-size: 0.58rem; }
+
+/* Cabeçalho de tabela: igual às abas do site (Inter 600, maiúsculas, tracking largo) */
+th {
+  font-family: var(--font-ui);
+  color: var(--text-muted);
+  font-weight: 600; font-size: 0.7rem; letter-spacing: 2px;
+}
+
+/* ---------- Botões ---------- */
+.btn {
+  font-family: var(--font-ui);
+  border: 1px solid var(--border-ember);
+  background: var(--bg-panel-alt);
+  color: var(--text-primary);
+  border-radius: 6px; font-weight: 600;
+}
+.btn:hover {
+  background: var(--bg-selected);
+  border-color: var(--accent-flame);
+  color: #fff; box-shadow: none;
+}
+
+/* ---------- Cartões e painéis ---------- */
+.table-container, .guide-modal, .region-panel, .side-menu,
+.filter-panel, .dropdown-menu { border-radius: 8px; }
+.table-container {
+  border-color: var(--border-ember-soft);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Sem itálico em lugar nenhum (o site não usa) */
+em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
+
+:focus-visible { outline: 2px solid var(--accent-flame); outline-offset: 2px; }
+::selection { background: rgba(184, 129, 252, 0.35); color: #fff; }
+
+/* ---------- Correção do desfoque no hover dos botões da célula de classe ----------
+   O hover usa transform: scale(). Sem isto, só NO HOVER o botão vira uma camada própria do
+   navegador, e o texto ao redor (balão de equipamentos, nome) muda de antialiasing — aparece
+   "desfocado". Mantendo botões e textos sempre na própria camada desde o início, nada muda
+   quando o mouse passa: o efeito de aumentar continua igual ao original. */
+.btn-gear-mini,
+.btn-add-content-mini,
+.btn-remove-row,
+.gear-bubble,
+.class-nickname,
+.class-cell-wrapper {
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.btn-gear-mini, .btn-add-content-mini, .btn-remove-row { transition: all 0.2s; }
+.btn-remove-row { transition: color 0.2s, transform 0.2s; }
+
+/* ---------- Chips na nova paleta ----------
+   Pendente: vermelho do site (#e4454a), borda suave + leve tom no fundo
+   Concluído: verde do site (#2ea068), idem
+   Sub-rótulos (contagem / ID): âmbar do site (#f7a800) */
+.content-chip,
+.event-chip {
+  background: rgba(228, 69, 74, 0.07);
+  border: 1px solid rgba(228, 69, 74, 0.55);
+  color: var(--text-primary);
+  border-radius: 5px;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.content-chip:hover,
+.event-chip:hover {
+  background: rgba(228, 69, 74, 0.12);
+  border-color: rgba(228, 69, 74, 0.8);
+}
+.content-chip.done,
+.event-chip.done {
+  background: rgba(46, 160, 104, 0.10);
+  border-color: rgba(46, 160, 104, 0.6);
+  color: #5ccd96;
+}
+.content-chip.done:hover,
+.event-chip.done:hover {
+  background: rgba(46, 160, 104, 0.16);
+  border-color: rgba(46, 160, 104, 0.85);
+}
+.chip-status { color: var(--danger); }
+.content-chip.done .chip-status,
+.event-chip.done .chip-status { color: #5ccd96; }
+.chip-remove { color: var(--text-faint); }
+.chip-remove:hover { color: var(--danger); }
+.chip-sublabel {
+  background: rgba(247, 168, 0, 0.12);
+  color: var(--text-muted);
+}
+.chip-account-tag {
+  background: rgba(247, 168, 0, 0.16);
+  color: var(--accent-gold);
+}
+.content-chip.chip-priority.done .chip-sublabel { color: #5ccd96; }
+
+
+/* =========================================================
+   Coluna CLASSE — layout original + visual do site
+   Layout: nome (classe + nickname) no canto superior esquerdo, ícone abaixo,
+   balão de equipamentos ao lado, botão de troca de classe (⇄) no lugar de antes.
+   Visual: fontes do site e neon roxo no ícone.
+   ========================================================= */
+
+/* Classe: Inter 600, MAIÚSCULA, espaçamento largo, cinza apagado */
+.class-nickname-class {
+  font-family: var(--font-ui);
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #6a6676;
+  text-shadow: none;
+}
+
+/* Nickname = nome do personagem no site: Cinzel branco, sem itálico */
+.class-nickname-name {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-primary);
+}
+.class-nickname.nick-long .class-nickname-class { font-size: 0.52rem; letter-spacing: 0.6px; }
+.class-nickname.nick-long .class-nickname-name  { font-size: 0.64rem; }
+
+/* Ícone da classe: caixa escura do site + neon roxo ao redor */
+.class-cell-wrapper {
+  background: #05040a;
+  border: 1px solid rgba(184, 129, 252, 0.55);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(184, 129, 252, 0.18),
+    0 0 8px 1px rgba(184, 129, 252, 0.45),
+    0 0 16px 2px rgba(184, 129, 252, 0.22),
+    inset 0 0 8px rgba(184, 129, 252, 0.18);
+}
+
+/* =========================================================
+   Manual com abas (estilo navegador)
+   ========================================================= */
+.manual-modal {
+  max-width: 920px;
+  height: min(82vh, 720px);
+  max-height: 82vh;
+  background: var(--bg-panel);
+  border-color: var(--border-ember);
+  overflow: hidden;
+}
+.manual-modal-header {
+  background: var(--bg-panel-alt);
+  border-bottom: none;
+  padding: 12px 18px 10px;
+}
+
+/* Barra de abas: fundo rebaixado, abas arredondadas em cima, aba ativa "cola" no painel */
+.manual-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 12px;
+  background: var(--bg-panel-alt);
+  border-bottom: 1px solid var(--border-ember-soft);
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.manual-tabs::-webkit-scrollbar { display: none; }
+
+.manual-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 0 14px;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  cursor: var(--cursor-pointer);
+  transition: background-color 0.15s, color 0.15s;
+}
+.manual-tab svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.85; }
+.manual-tab:hover { background: rgba(255, 255, 255, 0.04); color: var(--text-primary); }
+.manual-tab.active {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border-color: var(--border-ember-soft);
+}
+.manual-tab.active svg { color: var(--accent-flame); opacity: 1; }
+/* linha de destaque no topo da aba ativa */
+.manual-tab.active::before {
+  content: "";
+  position: absolute;
+  left: 8px; right: 8px; top: -1px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--accent-flame);
+}
+.manual-tab:focus-visible { outline: 2px solid var(--accent-flame); outline-offset: -2px; }
+
+/* Corpo / painéis */
+.manual-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px 22px 22px;
+  overflow-y: auto;
+}
+.manual-panel[hidden] { display: none; }
+.manual-panel.active { animation: manualPanelIn 0.18s ease; }
+@keyframes manualPanelIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .manual-panel.active { animation: none; } }
+
+.manual-lead {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--bg-inset);
+  border-left: 2px solid var(--accent-gold);
+  border-radius: 0 6px 6px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.manual-lead strong { color: var(--text-primary); }
+
+.manual-section h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.manual-section .manual-sec-body p,
+.manual-section .manual-sec-body li {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.manual-section .manual-sec-body p { margin-bottom: 8px; }
+.manual-section .manual-sec-body p:last-child { margin-bottom: 0; }
+.manual-section .manual-sec-body strong { color: var(--text-primary); font-weight: 600; }
+.manual-section .manual-sec-body em { font-style: normal; color: var(--accent-flame); }
+.manual-sec-icon { display: inline-flex; align-items: center; }
+
+/* Listas e passos */
+.manual-list { list-style: none; padding: 0; margin: 4px 0 8px; }
+.manual-list li { position: relative; padding-left: 16px; margin: 4px 0; }
+.manual-list li::before {
+  content: ""; position: absolute; left: 3px; top: 0.7em;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent-gold);
+}
+.manual-list li .manual-icon { vertical-align: middle; margin-right: 2px; }
+
+.manual-steps { list-style: none; counter-reset: ms; padding: 0; margin: 6px 0 4px; }
+.manual-steps li {
+  counter-increment: ms;
+  position: relative;
+  min-height: 24px;
+  padding: 2px 0 2px 34px;
+  margin: 8px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.manual-steps li::before {
+  content: counter(ms);
+  position: absolute; left: 0; top: 0;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--accent-flame);
+  border-radius: 50%;
+  background: rgba(184, 129, 252, 0.10);
+  color: var(--accent-flame);
+  font-size: 11px; font-weight: 700;
+}
+.manual-steps li strong { color: var(--text-primary); }
+
+/* Caixa de dica / aviso */
+.manual-tip {
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: rgba(247, 168, 0, 0.07);
+  border: 1px solid rgba(247, 168, 0, 0.28);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Teclas */
+.manual-section kbd, .manual-lead kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-ember);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  text-align: center;
+}
+
+/* Ícone do botão de trocar classe (⇄) */
+.manual-icon-swap {
+  width: 18px; height: 18px;
+  color: var(--accent-gold);
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .manual-modal { height: 88vh; max-height: 88vh; }
+  .manual-modal-body { padding: 14px 14px 18px; }
+  .manual-tab { padding: 0 10px; }
+}
+
+/* =========================================================
+   Linha amarela "subindo" (igual ao item ativo do menu do site)
+   Em vez de preencher o botão com a cor de destaque, o botão mantém o fundo e
+   uma linha âmbar sobe por baixo dele no hover / clique, como em "Home" no site.
+   Vale para: print de tela, botões de vídeo da raid, gavetas do menu de equipamento
+   e seleção do tipo de party. O botão do escudo (equipamento) segue como era.
+   ========================================================= */
+.btn.btn-screenshot,
+.raid-video-link { --yl-ease: cubic-bezier(0.2, 0.9, 0.3, 1.35); }
+
+.btn.btn-screenshot { position: relative; }
+.raid-video-link    { position: relative; }
+
+.btn.btn-screenshot::after,
+.raid-video-link::after {
+  content: "";
+  position: absolute;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-gold);
+  opacity: 0;
+  transform: translateY(7px) scaleX(0.25);
+  transition: transform 0.3s var(--yl-ease), opacity 0.18s ease;
+  pointer-events: none;
+}
+/* posição da linha em cada botão */
+.btn.btn-screenshot::after { left: 50%; bottom: 4px; width: 14px; margin-left: -7px; }
+.raid-video-link::after    { left: 12px; right: 12px; bottom: 3px; }
+
+/* hover / foco / aberto: a linha sobe e o conteúdo fica branco (como "Home" ativo no site) */
+.btn.btn-screenshot:hover::after,
+.btn.btn-screenshot:focus-visible::after,
+.btn.btn-screenshot.is-busy::after,
+.raid-video-link:hover::after,
+.raid-video-link:focus-visible::after,
+.raid-video-link.is-open::after {
+  opacity: 1;
+  transform: translateY(0) scaleX(1);
+}
+
+/* sem preenchimento: cancela o fundo cheio de antes */
+.btn.btn-screenshot:hover,
+.btn.btn-screenshot.is-busy {
+  background: var(--bg-panel-alt);
+  border-color: var(--accent-gold);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+.raid-video-link:hover,
+.raid-video-link.is-open {
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  border-color: var(--accent-ember);
+}
+
+/* clique: a linha sobe de novo com um pequeno "salto", como se tivesse sido clicada */
+@keyframes ylClick {
+  0%   { opacity: 0; transform: translateY(9px) scaleX(0.2); }
+  55%  { opacity: 1; transform: translateY(-2px) scaleX(1.12); }
+  100% { opacity: 1; transform: translateY(0) scaleX(1); }
+}
+.btn.btn-screenshot.is-clicked::after,
+.raid-video-link:active::after {
+  animation: ylClick 0.36s var(--yl-ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn.btn-screenshot::after, .raid-video-link::after { transition: opacity 0.1s; transform: none; }
+  .btn.btn-screenshot.is-clicked::after, .raid-video-link:active::after { animation: none; }
+}
+
+/* ---------- Gavetas do menu de equipamento (Set/Weapon, slot, raridade, nível, refino) ----------
+   Hover = borda amarela + texto amarelo, igual aos itens do menu ☰ (.side-menu-item:hover) */
+.gear-flyout-item:hover {
+  background: var(--bg-inset);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  font-weight: normal;
+}
+.gear-flyout-item:hover .flyout-arrow { color: var(--accent-gold); }
+.gear-enhance-btn:hover {
+  background: var(--bg-inset);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+/* ---------- Tipo de party: a linha amarela aparece SÓ no selecionado ---------- */
+.ap-type-btn { position: relative; }
+.ap-type-btn::after {
+  content: "";
+  position: absolute;
+  left: 14px; right: 14px; bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-gold);
+  opacity: 0;
+  transform: translateY(6px) scaleX(0.25);
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.35), opacity 0.18s ease;
+  pointer-events: none;
+}
+.ap-type-btn.active::after {
+  opacity: 1;
+  transform: translateY(0) scaleX(1);
+  animation: ylClick 0.36s cubic-bezier(0.2, 0.9, 0.3, 1.35);   /* sobe ao ser selecionado */
+}
+.ap-type-btn.active {
+  border-color: var(--border-ember-soft);
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+/* passar o mouse só muda levemente a borda — sem linha, sem brilho */
+@media (hover: hover) {
+  .ap-type-btn:hover { border-color: var(--border-ember); color: var(--text-primary); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ap-type-btn::after { transition: opacity 0.1s; transform: none; }
+  .ap-type-btn.active::after { animation: none; }
+}
+
+/* ---------- Menu de seleção de conteúdo (botão + do personagem) ----------
+   Hover = borda amarela + texto amarelo, igual aos itens do menu ☰ e das gavetas de equipamento */
+.content-item-mini:hover {
+  background: var(--bg-inset);
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  font-weight: normal;
+}
+/* ✕ do preset: como o fundo não é mais preenchido, o ícone fica cinza (vermelho ao passar nele) */
+.content-item-preset:hover .preset-delete { color: var(--text-muted); }
+.preset-delete:hover,
+.content-item-preset:hover .preset-delete:hover {
+  background: rgba(228, 69, 74, 0.14);
+  color: var(--danger);
+}
+/* "Remover Todos" mantém o vermelho (ação destrutiva), mas também sem preenchimento total */
+.content-item-danger:hover {
+  background: rgba(228, 69, 74, 0.12);
+  border-color: var(--danger);
+  color: var(--danger);
+}

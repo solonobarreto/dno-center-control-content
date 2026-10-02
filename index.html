@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dragon Nest Origins [CCC]</title>
+  <meta name="theme-color" content="#09090E">
   <link rel="icon" href="img/navegador.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 </head>
@@ -103,37 +104,86 @@
 
         <!-- Panel: Main -->
         <div class="side-menu-panel" id="sideMenuMain">
-          <button class="side-menu-item" id="openGuideBtn"   data-i18n="guide">Guide</button>
-          <button class="side-menu-item" id="openCompMakerBtn" data-i18n="compMaker">Criador de Composições</button>
-          <button class="side-menu-item" id="openAutoPartyBtn" data-i18n="autoParty">Criador de Grupos</button>
-          <button class="side-menu-item" id="openLanguageBtn" data-i18n="idioma">Idioma</button>
-          <button class="side-menu-item" id="openManualFromMenuBtn" data-i18n="manual">Manual</button>
+          <button class="side-menu-item menu-card" id="openGuideBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg></span>
+            <span class="menu-card-title" data-i18n="guide">Guia</span>
+            <span class="menu-card-desc" data-i18n="menuDescGuide">Jade, Espírito, rotação, progressão e raids.</span>
+          </button>
+          <button class="side-menu-item menu-card" id="openCompMakerBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></svg></span>
+            <span class="menu-card-title" data-i18n="compMaker">Criador de Composições</span>
+            <span class="menu-card-desc" data-i18n="menuDescComp">Monte uma composição de até 8 classes e some os buffs.</span>
+          </button>
+          <button class="side-menu-item menu-card" id="openAutoPartyBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <span class="menu-card-title" data-i18n="autoParty">Criador de Grupos</span>
+            <span class="menu-card-desc" data-i18n="menuDescParty">Gera a melhor party a partir dos backups dos jogadores.</span>
+          </button>
+          <button class="side-menu-item menu-card" id="openLanguageBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg></span>
+            <span class="menu-card-title" data-i18n="idioma">Idioma</span>
+            <span class="menu-card-desc" data-i18n="menuDescLang">Troque o idioma do site.</span>
+          </button>
+          <button class="side-menu-item menu-card" id="openManualFromMenuBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
+            <span class="menu-card-title" data-i18n="manual">Manual</span>
+            <span class="menu-card-desc" data-i18n="menuDescManual">Aprenda a usar o site passo a passo.</span>
+          </button>
         </div>
 
         <!-- Panel: Guide -->
         <div class="side-menu-panel side-menu-panel-secondary" id="sideMenuGuide">
-          <button class="side-menu-back" id="backFromGuideBtn">‹ <span data-i18n="back">Voltar</span></button>
-          <button class="side-menu-item" id="guideJadeBtn"     data-i18n="guideJade">Enhancement Jade</button>
-          <button class="side-menu-item" id="guideSpiritBtn"   data-i18n="guideSpirit">Enhancement Spirit</button>
-          <button class="side-menu-item" id="guideRotationBtn" data-i18n="guideRotation">Daily Rotation</button>
-          <button class="side-menu-item" id="guideProgressionBtn" data-i18n="guideProgression">Progressão no Jogo</button>
-          <button class="side-menu-item" id="openRaidBtn"      data-i18n="guideRaid">Raid</button>
+          <button class="side-menu-back" id="backFromGuideBtn"><span class="comp-panel-arrow comp-panel-arrow-left">‹</span> <span data-i18n="back">Voltar</span></button>
+          <button class="side-menu-item menu-card" id="guideJadeBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg></span>
+            <span class="menu-card-title" data-i18n="guideJade">Aprimoramento de Jade</span>
+            <span class="menu-card-desc" data-i18n="menuDescJade">Guia de aprimoramento de Jade.</span>
+          </button>
+          <button class="side-menu-item menu-card" id="guideSpiritBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 3v4M21 5h-4"/></svg></span>
+            <span class="menu-card-title" data-i18n="guideSpirit">Aprimoramento de Espírito</span>
+            <span class="menu-card-desc" data-i18n="menuDescSpirit">Guia de aprimoramento de Espírito.</span>
+          </button>
+          <button class="side-menu-item menu-card" id="guideRotationBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-15-6.7L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 15 6.7L21 16"/><path d="M16 16h5v5"/></svg></span>
+            <span class="menu-card-title" data-i18n="guideRotation">Rotação Diária</span>
+            <span class="menu-card-desc" data-i18n="menuDescRotation">Conteúdos que mudam a cada dia.</span>
+          </button>
+          <button class="side-menu-item menu-card" id="guideProgressionBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg></span>
+            <span class="menu-card-title" data-i18n="guideProgression">Progressão no Jogo</span>
+            <span class="menu-card-desc" data-i18n="menuDescProgression">Passo a passo do nível 1 ao endgame.</span>
+          </button>
+          <button class="side-menu-item menu-card" id="openRaidBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="M12.5 17h-1"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></svg></span>
+            <span class="menu-card-title" data-i18n="guideRaid">Raid</span>
+            <span class="menu-card-desc" data-i18n="menuDescRaid">Estágios e vídeos de cada raid.</span>
+          </button>
         </div>
 
         <!-- Panel: Raid -->
         <div class="side-menu-panel side-menu-panel-secondary" id="sideMenuRaid">
-          <button class="side-menu-back" id="backFromRaidBtn">‹ <span data-i18n="back">Voltar</span></button>
-          <button class="side-menu-item" id="raidDDNBtn"  data-i18n="raidDDN">Desert Dragon</button>
-          <button class="side-menu-item" id="raidRDNBtn"  data-i18n="raidRDN">Red Dragon</button>
-          <button class="side-menu-item side-menu-item-wip" id="raidIDNBtn">
-            <span data-i18n="raidIDN">Ice Dragon</span>
-            <small class="side-menu-legend" data-i18n="raidIDNWip">Em processo de adaptação</small>
+          <button class="side-menu-back" id="backFromRaidBtn"><span class="comp-panel-arrow comp-panel-arrow-left">‹</span> <span data-i18n="back">Voltar</span></button>
+          <button class="side-menu-item menu-card" id="raidDDNBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>
+            <span class="menu-card-title" data-i18n="raidDDN">Dragão do Deserto</span>
+            <span class="menu-card-desc" data-i18n="menuDescRaidItem">Estágios e vídeo da raid.</span>
+          </button>
+          <button class="side-menu-item menu-card" id="raidRDNBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3 0 1.4 1 2.5 2.5 2.5z"/></svg></span>
+            <span class="menu-card-title" data-i18n="raidRDN">Dragão Vermelho</span>
+            <span class="menu-card-desc" data-i18n="menuDescRaidItem">Estágios e vídeo da raid.</span>
+          </button>
+          <button class="side-menu-item menu-card menu-card-wip" id="raidIDNBtn">
+            <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h20M12 2v20"/><path d="m20 16-4-4 4-4M4 8l4 4-4 4M16 4l-4 4-4-4M8 20l4-4 4 4"/></svg></span>
+            <span class="menu-card-title" data-i18n="raidIDN">Dragão de Gelo</span>
+            <span class="menu-card-desc" data-i18n="raidIDNWip">Em processo de adaptação</span>
           </button>
         </div>
 
         <!-- Panel: Language -->
         <div class="side-menu-panel side-menu-panel-secondary" id="sideMenuLanguage">
-          <button class="side-menu-back" id="backToMainMenuBtn">‹ <span data-i18n="back">Voltar</span></button>
+          <button class="side-menu-back" id="backToMainMenuBtn"><span class="comp-panel-arrow comp-panel-arrow-left">‹</span> <span data-i18n="back">Voltar</span></button>
           <button class="side-menu-item lang-item" data-lang="pt-BR" data-i18n="langPtBR">Português - Brasil</button>
           <button class="side-menu-item lang-item" data-lang="pt-PT" data-i18n="langPtPT">Português - Portugal</button>
           <button class="side-menu-item lang-item" data-lang="es"    data-i18n="langEs">Espanhol</button>
@@ -155,43 +205,10 @@
     <div class="manual-modal">
       <div class="manual-modal-header">
         <h3 data-i18n="manualTitle">Manual do Usuário</h3>
-        <button id="closeManualBtn" class="btn-close-manual" title="Fechar">×</button>
+        <button id="closeManualBtn" class="btn-close-guide" title="Fechar" aria-label="Fechar">✕</button>
       </div>
-      <div class="manual-modal-body">
-        <div class="manual-section">
-          <h4><span class="manual-icon manual-icon-add">+</span> <span data-i18n="manualAddChar">Adicionar Personagem</span></h4>
-          <p data-i18n="manualAddCharDesc">Clique no botão <strong>+</strong> na barra de controles para abrir a grade de classes. Escolha uma classe, digite um apelido (nickname) e confirme. O apelido precisa ser único entre todos os personagens.</p>
-        </div>
-        <div class="manual-section">
-          <h4><span class="manual-icon manual-icon-remove-row">×</span> <span data-i18n="manualRemoveChar">Remover Personagem</span></h4>
-          <p data-i18n="manualRemoveCharDesc">Clique no <strong>×</strong> no canto superior esquerdo da célula da classe para remover a linha daquele personagem.</p>
-        </div>
-        <div class="manual-section">
-          <h4><span class="manual-icon manual-icon-mini-add">+</span> <span data-i18n="manualAddContent">Adicionar Conteúdo</span></h4>
-          <p data-i18n="manualAddContentDesc">Clique no pequeno botão <strong>+</strong> sobre o ícone da classe para abrir a lista de conteúdos e clique em um item para adicioná-lo.</p>
-        </div>
-        <div class="manual-section">
-          <h4><span class="manual-icon manual-icon-status">✗ ✓</span> <span data-i18n="manualMarkContent">Marcar Conteúdo Concluído</span></h4>
-          <p data-i18n="manualMarkContentDesc">Clique no ícone ou no texto de um chip de conteúdo para alternar entre pendente (✗) e concluído (✓).</p>
-        </div>
-        <div class="manual-section">
-          <h4><span class="manual-icon manual-icon-chip-remove">✕</span> <span data-i18n="manualRemoveContent">Remover Conteúdo</span></h4>
-          <p data-i18n="manualRemoveContentDesc">Clique no <strong>✕</strong> à direita do chip para removê-lo da linha.</p>
-        </div>
-        <div class="manual-section">
-          <h4>
-            <span class="manual-icon manual-icon-gear">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 L4 5 V11 C4 16 7.5 20.5 12 22 C16.5 20.5 20 16 20 11 V5 Z"/></svg>
-            </span>
-            <span data-i18n="manualEquip">Configurar Equipamento</span>
-          </h4>
-          <p data-i18n="manualEquipDesc">Clique no ícone de escudo para configurar Set ou Arma: escolha o slot, a raridade (Epic, Unique, Legend), o nível (Lv80/Lv90) e o refino (+0 a +15).</p>
-        </div>
-        <div class="manual-section">
-          <h4 data-i18n="manualBackup">Backup (Exportar / Importar)</h4>
-          <p data-i18n="manualBackupDesc">Como os dados são armazenados apenas no navegador, eles são perdidos ao fechar a aba. Use <strong>Export</strong> para salvar um arquivo e <strong>Import</strong> para restaurar.</p>
-        </div>
-      </div>
+      <div class="manual-tabs" id="manualTabs" role="tablist" aria-label="Manual"></div>
+      <div class="manual-modal-body" id="manualBody"></div>
     </div>
   </div>
 
@@ -339,6 +356,7 @@
   </div>
 
   <script src="js/app.js"></script>
+  <script src="js/manual.js"></script>
   <script>
   // =========================================================
   // i18n — internationalisation
@@ -354,7 +372,7 @@
       importTitle: "Importar dados de um arquivo",
       addClass: "Adicionar Classe",
       menu: "Menu",
-      guide: "Guide",
+      guide: "Guia",
       idioma: "Idioma",
       langPtBR: "Português - Brasil",
       langPtPT: "Português - Portugal",
@@ -368,14 +386,25 @@
       langDe: "Alemão",
       manual: "Manual",
       back: "Voltar",
-      guideJade: "Enhancement Jade",
-      guideSpirit: "Enhancement Spirit",
+      menuDescGuide: "Jade, Espírito, rotação, progressão e raids.",
+      menuDescComp: "Monte uma composição de até 8 classes e some os buffs.",
+      menuDescParty: "Gera a melhor party a partir dos backups dos jogadores.",
+      menuDescLang: "Troque o idioma do site.",
+      menuDescManual: "Aprenda a usar o site passo a passo.",
+      menuDescJade: "Guia de aprimoramento de Jade.",
+      menuDescSpirit: "Guia de aprimoramento de Espírito.",
+      menuDescRotation: "Conteúdos que mudam a cada dia.",
+      menuDescProgression: "Passo a passo do nível 1 ao endgame.",
+      menuDescRaid: "Estágios e vídeos de cada raid.",
+      menuDescRaidItem: "Estágios e vídeo da raid.",
+      guideJade: "Aprimoramento de Jade",
+      guideSpirit: "Aprimoramento de Espírito",
       guideRotation: "Rotação Diária",
       guideProgression: "Progressão no Jogo",
       guideRaid: "Raid",
-      raidDDN: "Desert Dragon",
-      raidRDN: "Red Dragon",
-      raidIDN: "Ice Dragon",
+      raidDDN: "Dragão do Deserto",
+      raidRDN: "Dragão Vermelho",
+      raidIDN: "Dragão de Gelo",
       raidIDNWip: "Em processo de adaptação",
       raidFullVideo: "▶ Vídeo completo da raid",
       raidStageVideo: "▶ Vídeo deste estágio",
@@ -560,6 +589,28 @@
       statActSpeed: "Act. Speed",
       statCdReduction: "Red. Recarga",
       statCritical: "Critical",
+      debTakenPAtk: "ATK Físico Recebido",
+      debTakenMAtk: "ATK Mágico Recebido",
+      debLightRes: "Resist. Luz",
+      debDarkRes: "Resist. Trevas",
+      debIceRes: "Resist. Gelo",
+      debFireRes: "Resist. Fogo",
+      debCritRes: "Resist. Crítica",
+      debRedPAtk: "Redução ATK Físico",
+      debRedMAtk: "Redução ATK Mágico",
+      buffIncPDef: "Aumento DEF Física",
+      buffIncMDef: "Aumento DEF Mágica",
+      buffIncPAtk: "Aumento ATK Físico",
+      buffIncMAtk: "Aumento ATK Mágico",
+      buffIncStr: "Aumento FOR",
+      buffIncAgi: "Aumento AGI",
+      buffIncInt: "Aumento INT",
+      buffIncVit: "Aumento VIT",
+      buffIncLight: "Aumento ATK Luz",
+      buffIncDark: "Aumento ATK Trevas",
+      buffIncIce: "Aumento ATK Gelo",
+      buffIncFire: "Aumento ATK Fogo",
+      buffIncCrit: "Aumento Crítico",
       statFinalDmg: "Amp. Final Damage",
     },
     "pt-PT": {
@@ -572,7 +623,7 @@
       importTitle: "Importar dados de um ficheiro",
       addClass: "Adicionar Classe",
       menu: "Menu",
-      guide: "Guide",
+      guide: "Guia",
       idioma: "Idioma",
       langPtBR: "Português - Brasil",
       langPtPT: "Português - Portugal",
@@ -586,14 +637,25 @@
       langDe: "Alemão",
       manual: "Manual",
       back: "Voltar",
-      guideJade: "Enhancement Jade",
-      guideSpirit: "Enhancement Spirit",
+      menuDescGuide: "Jade, Espírito, rotação, progressão e raids.",
+      menuDescComp: "Monte uma composição de até 8 classes e some os buffs.",
+      menuDescParty: "Gera a melhor party a partir dos backups dos jogadores.",
+      menuDescLang: "Altere o idioma do site.",
+      menuDescManual: "Aprenda a usar o site passo a passo.",
+      menuDescJade: "Guia de aprimoramento de Jade.",
+      menuDescSpirit: "Guia de aprimoramento de Espírito.",
+      menuDescRotation: "Conteúdos que mudam a cada dia.",
+      menuDescProgression: "Passo a passo do nível 1 ao endgame.",
+      menuDescRaid: "Estágios e vídeos de cada raid.",
+      menuDescRaidItem: "Estágios e vídeo da raid.",
+      guideJade: "Aprimoramento de Jade",
+      guideSpirit: "Aprimoramento de Espírito",
       guideRotation: "Rotação Diária",
       guideProgression: "Progressão no Jogo",
       guideRaid: "Raid",
-      raidDDN: "Desert Dragon",
-      raidRDN: "Red Dragon",
-      raidIDN: "Ice Dragon",
+      raidDDN: "Dragão do Deserto",
+      raidRDN: "Dragão Vermelho",
+      raidIDN: "Dragão de Gelo",
       raidIDNWip: "Em processo de adaptação",
       raidFullVideo: "▶ Vídeo completo da raid",
       raidStageVideo: "▶ Vídeo deste estágio",
@@ -754,6 +816,28 @@
       statActSpeed: "Act. Speed",
       statCdReduction: "Red. Recarga",
       statCritical: "Critical",
+      debTakenPAtk: "ATK Físico Recebido",
+      debTakenMAtk: "ATK Mágico Recebido",
+      debLightRes: "Resist. Luz",
+      debDarkRes: "Resist. Trevas",
+      debIceRes: "Resist. Gelo",
+      debFireRes: "Resist. Fogo",
+      debCritRes: "Resist. Crítica",
+      debRedPAtk: "Redução ATK Físico",
+      debRedMAtk: "Redução ATK Mágico",
+      buffIncPDef: "Aumento DEF Física",
+      buffIncMDef: "Aumento DEF Mágica",
+      buffIncPAtk: "Aumento ATK Físico",
+      buffIncMAtk: "Aumento ATK Mágico",
+      buffIncStr: "Aumento FOR",
+      buffIncAgi: "Aumento AGI",
+      buffIncInt: "Aumento INT",
+      buffIncVit: "Aumento VIT",
+      buffIncLight: "Aumento ATK Luz",
+      buffIncDark: "Aumento ATK Trevas",
+      buffIncIce: "Aumento ATK Gelo",
+      buffIncFire: "Aumento ATK Fogo",
+      buffIncCrit: "Aumento Crítico",
       statFinalDmg: "Amp. Final Damage",
     },
     "es": {
@@ -780,8 +864,19 @@
       langDe: "Alemán",
       manual: "Manual",
       back: "Volver",
-      guideJade: "Jade de Mejora",
-      guideSpirit: "Espíritu de Mejora",
+      menuDescGuide: "Jade, Espíritu, rotación, progresión y raids.",
+      menuDescComp: "Arma una composición de hasta 8 clases y suma sus buffs.",
+      menuDescParty: "Genera la mejor party con los backups de los jugadores.",
+      menuDescLang: "Cambia el idioma del sitio.",
+      menuDescManual: "Aprende a usar el sitio paso a paso.",
+      menuDescJade: "Guía de mejora de Jade.",
+      menuDescSpirit: "Guía de mejora de Espíritu.",
+      menuDescRotation: "Contenidos que cambian cada día.",
+      menuDescProgression: "Paso a paso del nivel 1 al endgame.",
+      menuDescRaid: "Etapas y vídeos de cada raid.",
+      menuDescRaidItem: "Etapas y vídeo de la raid.",
+      guideJade: "Mejora de Jade",
+      guideSpirit: "Mejora de Espíritu",
       guideRotation: "Rotación Diaria",
       guideProgression: "Progresión en el Juego",
       guideRaid: "Raid",
@@ -948,6 +1043,28 @@
       statActSpeed: "Act. Speed",
       statCdReduction: "Red. Recarga",
       statCritical: "Critical",
+      debTakenPAtk: "ATK Físico Recibido",
+      debTakenMAtk: "ATK Mágico Recibido",
+      debLightRes: "Resist. Luz",
+      debDarkRes: "Resist. Oscuridad",
+      debIceRes: "Resist. Hielo",
+      debFireRes: "Resist. Fuego",
+      debCritRes: "Resist. Crítica",
+      debRedPAtk: "Reducción ATK Físico",
+      debRedMAtk: "Reducción ATK Mágico",
+      buffIncPDef: "Aumento DEF Física",
+      buffIncMDef: "Aumento DEF Mágica",
+      buffIncPAtk: "Aumento ATK Físico",
+      buffIncMAtk: "Aumento ATK Mágico",
+      buffIncStr: "Aumento FUE",
+      buffIncAgi: "Aumento AGI",
+      buffIncInt: "Aumento INT",
+      buffIncVit: "Aumento VIT",
+      buffIncLight: "Aumento ATK Luz",
+      buffIncDark: "Aumento ATK Oscuridad",
+      buffIncIce: "Aumento ATK Hielo",
+      buffIncFire: "Aumento ATK Fuego",
+      buffIncCrit: "Aumento Crítico",
       statFinalDmg: "Amp. Final Damage",
     },
     "en": {
@@ -974,6 +1091,17 @@
       langDe: "German",
       manual: "Manual",
       back: "Back",
+      menuDescGuide: "Jade, Spirit, rotation, progression and raids.",
+      menuDescComp: "Build a composition of up to 8 classes and sum their buffs.",
+      menuDescParty: "Generate the best party from players' backups.",
+      menuDescLang: "Change the site language.",
+      menuDescManual: "Learn how to use the site step by step.",
+      menuDescJade: "Jade enhancement guide.",
+      menuDescSpirit: "Spirit enhancement guide.",
+      menuDescRotation: "Content that changes every day.",
+      menuDescProgression: "Step by step from level 1 to endgame.",
+      menuDescRaid: "Stages and videos for each raid.",
+      menuDescRaidItem: "Stages and raid video.",
       guideJade: "Enhancement Jade",
       guideSpirit: "Enhancement Spirit",
       guideRotation: "Daily Rotation",
@@ -1166,6 +1294,28 @@
       statActSpeed: "Act. Speed",
       statCdReduction: "CD Reduction",
       statCritical: "Critical",
+      debTakenPAtk: "Taken P.ATK",
+      debTakenMAtk: "Taken M.ATK",
+      debLightRes: "Light Resistance",
+      debDarkRes: "Dark Resistance",
+      debIceRes: "Ice Resistance",
+      debFireRes: "Fire Resistance",
+      debCritRes: "Critical Resistance",
+      debRedPAtk: "Reduction P.ATK",
+      debRedMAtk: "Reduction M.ATK",
+      buffIncPDef: "Increase P.DEF",
+      buffIncMDef: "Increase M.DEF",
+      buffIncPAtk: "Increase P.ATK",
+      buffIncMAtk: "Increase M.ATK",
+      buffIncStr: "Increase STR",
+      buffIncAgi: "Increase AGI",
+      buffIncInt: "Increase INT",
+      buffIncVit: "Increase VIT",
+      buffIncLight: "Increase Light ATK",
+      buffIncDark: "Increase Dark ATK",
+      buffIncIce: "Increase Ice ATK",
+      buffIncFire: "Increase Fire ATK",
+      buffIncCrit: "Increase Critical",
       statFinalDmg: "Final Dmg. Amp.",
     },
     "ru": {
@@ -1192,6 +1342,17 @@
       langDe: "Немецкий",
       manual: "Руководство",
       back: "Назад",
+      menuDescGuide: "Нефрит, Дух, ротация, прогресс и рейды.",
+      menuDescComp: "Соберите состав до 8 классов и сложите баффы.",
+      menuDescParty: "Создайте лучшую пати по бэкапам игроков.",
+      menuDescLang: "Сменить язык сайта.",
+      menuDescManual: "Как пользоваться сайтом шаг за шагом.",
+      menuDescJade: "Гайд по улучшению нефрита.",
+      menuDescSpirit: "Гайд по улучшению духа.",
+      menuDescRotation: "Контент, меняющийся каждый день.",
+      menuDescProgression: "Пошагово от 1 уровня до эндгейма.",
+      menuDescRaid: "Этапы и видео каждого рейда.",
+      menuDescRaidItem: "Этапы и видео рейда.",
       guideJade: "Камни улучшения",
       guideSpirit: "Дух улучшения",
       guideRotation: "Ежедневная ротация",
@@ -1360,6 +1521,28 @@
       statActSpeed: "Act. Speed",
       statCdReduction: "Сокр. КД",
       statCritical: "Critical",
+      debTakenPAtk: "Получ. Физ. АТК",
+      debTakenMAtk: "Получ. Маг. АТК",
+      debLightRes: "Сопр. Свету",
+      debDarkRes: "Сопр. Тьме",
+      debIceRes: "Сопр. Льду",
+      debFireRes: "Сопр. Огню",
+      debCritRes: "Крит. сопр.",
+      debRedPAtk: "Сниж. Физ. АТК",
+      debRedMAtk: "Сниж. Маг. АТК",
+      buffIncPDef: "Увел. Физ. ЗАЩ",
+      buffIncMDef: "Увел. Маг. ЗАЩ",
+      buffIncPAtk: "Увел. Физ. АТК",
+      buffIncMAtk: "Увел. Маг. АТК",
+      buffIncStr: "Увеличение СИЛ",
+      buffIncAgi: "Увеличение ЛОВ",
+      buffIncInt: "Увеличение ИНТ",
+      buffIncVit: "Увеличение VIT",
+      buffIncLight: "Увел. АТК Света",
+      buffIncDark: "Увел. АТК Тьмы",
+      buffIncIce: "Увел. АТК Льда",
+      buffIncFire: "Увел. АТК Огня",
+      buffIncCrit: "Увел. Critical",
       statFinalDmg: "Amp. Final Damage",
     },
     "fil": {
@@ -1386,14 +1569,25 @@
       langDe: "Aleman",
       manual: "Manwal",
       back: "Bumalik",
-      guideJade: "Enhancement Jade",
-      guideSpirit: "Enhancement Spirit",
-      guideRotation: "Daily Rotation",
-      guideProgression: "Progression sa Laro",
+      menuDescGuide: "Jade, Spirit, rotation, progression at raids.",
+      menuDescComp: "Bumuo ng komposisyon ng hanggang 8 class at pagsamahin ang buffs.",
+      menuDescParty: "Gumawa ng pinakamahusay na party mula sa backup ng mga manlalaro.",
+      menuDescLang: "Palitan ang wika ng site.",
+      menuDescManual: "Alamin kung paano gamitin ang site.",
+      menuDescJade: "Gabay sa pagpapahusay ng Jade.",
+      menuDescSpirit: "Gabay sa pagpapahusay ng Spirit.",
+      menuDescRotation: "Content na nagbabago araw-araw.",
+      menuDescProgression: "Hakbang-hakbang mula level 1 hanggang endgame.",
+      menuDescRaid: "Mga stage at video ng bawat raid.",
+      menuDescRaidItem: "Mga stage at video ng raid.",
+      guideJade: "Pagpapahusay ng Jade",
+      guideSpirit: "Pagpapahusay ng Spirit",
+      guideRotation: "Pang-araw-araw na Rotasyon",
+      guideProgression: "Pag-usad sa Laro",
       guideRaid: "Raid",
-      raidDDN: "Desert Dragon",
-      raidRDN: "Red Dragon",
-      raidIDN: "Ice Dragon",
+      raidDDN: "Dragon ng Disyerto",
+      raidRDN: "Pulang Dragon",
+      raidIDN: "Dragon ng Yelo",
       raidIDNWip: "Sa proseso ng adaptasyon",
       raidFullVideo: "▶ Buong video ng raid",
       raidStageVideo: "▶ Video ng stage na ito",
@@ -1554,6 +1748,28 @@
       statActSpeed: "Act. Speed",
       statCdReduction: "CD Reduction",
       statCritical: "Critical",
+      debTakenPAtk: "Natanggap na P.ATK",
+      debTakenMAtk: "Natanggap na M.ATK",
+      debLightRes: "Resist. Liwanag",
+      debDarkRes: "Resist. Dilim",
+      debIceRes: "Resist. Yelo",
+      debFireRes: "Resist. Apoy",
+      debCritRes: "Resist. Critical",
+      debRedPAtk: "Bawas P.ATK",
+      debRedMAtk: "Bawas M.ATK",
+      buffIncPDef: "Dagdag P.DEF",
+      buffIncMDef: "Dagdag M.DEF",
+      buffIncPAtk: "Dagdag P.ATK",
+      buffIncMAtk: "Dagdag M.ATK",
+      buffIncStr: "Dagdag STR",
+      buffIncAgi: "Dagdag AGI",
+      buffIncInt: "Dagdag INT",
+      buffIncVit: "Dagdag VIT",
+      buffIncLight: "Dagdag ATK Liwanag",
+      buffIncDark: "Dagdag ATK Dilim",
+      buffIncIce: "Dagdag ATK Yelo",
+      buffIncFire: "Dagdag ATK Apoy",
+      buffIncCrit: "Dagdag Critical",
       statFinalDmg: "Final Dmg. Amp.",
     },
     "id": {
@@ -1566,7 +1782,7 @@
       importTitle: "Impor data dari sebuah file",
       addClass: "Tambah Kelas",
       menu: "Menu",
-      guide: "Guide",
+      guide: "Panduan",
       idioma: "Bahasa",
       langPtBR: "Portugis - Brasil",
       langPtPT: "Portugis - Portugal",
@@ -1580,14 +1796,25 @@
       langDe: "Jerman",
       manual: "Manual",
       back: "Kembali",
-      guideJade: "Enhancement Jade",
-      guideSpirit: "Enhancement Spirit",
+      menuDescGuide: "Jade, Spirit, rotasi, progres, dan raid.",
+      menuDescComp: "Susun komposisi hingga 8 class dan jumlahkan buff-nya.",
+      menuDescParty: "Buat party terbaik dari backup para pemain.",
+      menuDescLang: "Ganti bahasa situs.",
+      menuDescManual: "Pelajari cara memakai situs ini.",
+      menuDescJade: "Panduan peningkatan Jade.",
+      menuDescSpirit: "Panduan peningkatan Spirit.",
+      menuDescRotation: "Konten yang berganti setiap hari.",
+      menuDescProgression: "Langkah demi langkah dari level 1 ke endgame.",
+      menuDescRaid: "Tahap dan video setiap raid.",
+      menuDescRaidItem: "Tahap dan video raid.",
+      guideJade: "Peningkatan Jade",
+      guideSpirit: "Peningkatan Spirit",
       guideRotation: "Rotasi Harian",
       guideProgression: "Progresi Permainan",
       guideRaid: "Raid",
-      raidDDN: "Desert Dragon",
-      raidRDN: "Red Dragon",
-      raidIDN: "Ice Dragon",
+      raidDDN: "Naga Gurun",
+      raidRDN: "Naga Merah",
+      raidIDN: "Naga Es",
       raidIDNWip: "Sedang dalam proses adaptasi",
       raidFullVideo: "▶ Video lengkap raid",
       raidStageVideo: "▶ Video tahap ini",
@@ -1748,6 +1975,28 @@
       statActSpeed: "Act. Speed",
       statCdReduction: "Red. Cooldown",
       statCritical: "Critical",
+      debTakenPAtk: "P.ATK Diterima",
+      debTakenMAtk: "M.ATK Diterima",
+      debLightRes: "Resistensi Cahaya",
+      debDarkRes: "Resistensi Kegelapan",
+      debIceRes: "Resistensi Es",
+      debFireRes: "Resistensi Api",
+      debCritRes: "Resistensi Kritikal",
+      debRedPAtk: "Pengurangan P.ATK",
+      debRedMAtk: "Pengurangan M.ATK",
+      buffIncPDef: "Naik P.DEF",
+      buffIncMDef: "Naik M.DEF",
+      buffIncPAtk: "Naik P.ATK",
+      buffIncMAtk: "Naik M.ATK",
+      buffIncStr: "Naik STR",
+      buffIncAgi: "Naik AGI",
+      buffIncInt: "Naik INT",
+      buffIncVit: "Naik VIT",
+      buffIncLight: "Naik ATK Cahaya",
+      buffIncDark: "Naik ATK Kegelapan",
+      buffIncIce: "Naik ATK Es",
+      buffIncFire: "Naik ATK Api",
+      buffIncCrit: "Naik Kritikal",
       statFinalDmg: "Final Dmg. Amp.",
     },
     "zh": {
@@ -1774,14 +2023,25 @@
       langDe: "德语",
       manual: "使用手册",
       back: "返回",
-      guideJade: "Enhancement Jade",
-      guideSpirit: "Enhancement Spirit",
+      menuDescGuide: "玉石、精魂、轮换、进度与团本。",
+      menuDescComp: "组建最多8个职业的阵容并累计增益。",
+      menuDescParty: "根据玩家备份生成最佳队伍。",
+      menuDescLang: "切换网站语言。",
+      menuDescManual: "一步步学习如何使用本站。",
+      menuDescJade: "玉石强化指南。",
+      menuDescSpirit: "精魂强化指南。",
+      menuDescRotation: "每日轮换的内容。",
+      menuDescProgression: "从1级到终局的分步指南。",
+      menuDescRaid: "各团本的阶段与视频。",
+      menuDescRaidItem: "阶段攻略与团本视频。",
+      guideJade: "玉石强化",
+      guideSpirit: "精魂强化",
       guideRotation: "每日轮换",
       guideProgression: "游戏进度",
       guideRaid: "副本",
-      raidDDN: "Desert Dragon",
-      raidRDN: "Red Dragon",
-      raidIDN: "Ice Dragon",
+      raidDDN: "沙漠之龙",
+      raidRDN: "红龙",
+      raidIDN: "冰龙",
       raidIDNWip: "适配中",
       raidFullVideo: "▶ 完整副本视频",
       raidStageVideo: "▶ 本阶段视频",
@@ -1942,6 +2202,28 @@
       statActSpeed: "攻速",
       statCdReduction: "冷却缩减",
       statCritical: "暴击",
+      debTakenPAtk: "受到物攻",
+      debTakenMAtk: "受到魔攻",
+      debLightRes: "光抗性",
+      debDarkRes: "暗抗性",
+      debIceRes: "冰抗性",
+      debFireRes: "火抗性",
+      debCritRes: "暴击抗性",
+      debRedPAtk: "物攻降低",
+      debRedMAtk: "魔攻降低",
+      buffIncPDef: "物防提升",
+      buffIncMDef: "魔防提升",
+      buffIncPAtk: "物攻提升",
+      buffIncMAtk: "魔攻提升",
+      buffIncStr: "力量提升",
+      buffIncAgi: "敏捷提升",
+      buffIncInt: "智力提升",
+      buffIncVit: "体力提升",
+      buffIncLight: "光攻提升",
+      buffIncDark: "暗攻提升",
+      buffIncIce: "冰攻提升",
+      buffIncFire: "火攻提升",
+      buffIncCrit: "暴击提升",
       statFinalDmg: "最终伤害加成",
     },
     "fr": {
@@ -1968,14 +2250,25 @@
       langDe: "Allemand",
       manual: "Manuel",
       back: "Retour",
-      guideJade: "Enhancement Jade",
-      guideSpirit: "Enhancement Spirit",
+      menuDescGuide: "Jade, Spirit, rotation, progression et raids.",
+      menuDescComp: "Composez jusqu'à 8 classes et additionnez leurs buffs.",
+      menuDescParty: "Générez la meilleure party à partir des sauvegardes.",
+      menuDescLang: "Changez la langue du site.",
+      menuDescManual: "Apprenez à utiliser le site pas à pas.",
+      menuDescJade: "Guide d'amélioration du Jade.",
+      menuDescSpirit: "Guide d'amélioration du Spirit.",
+      menuDescRotation: "Contenus qui changent chaque jour.",
+      menuDescProgression: "Pas à pas du niveau 1 à l'endgame.",
+      menuDescRaid: "Étapes et vidéos de chaque raid.",
+      menuDescRaidItem: "Étapes et vidéo du raid.",
+      guideJade: "Amélioration du Jade",
+      guideSpirit: "Amélioration du Spirit",
       guideRotation: "Rotation Quotidienne",
       guideProgression: "Progression du Jeu",
       guideRaid: "Raid",
-      raidDDN: "Desert Dragon",
-      raidRDN: "Red Dragon",
-      raidIDN: "Ice Dragon",
+      raidDDN: "Dragon du Désert",
+      raidRDN: "Dragon Rouge",
+      raidIDN: "Dragon de Glace",
       raidIDNWip: "En cours d'adaptation",
       raidFullVideo: "▶ Vidéo complète du raid",
       raidStageVideo: "▶ Vidéo de cette étape",
@@ -2136,6 +2429,28 @@
       statActSpeed: "Act. Speed",
       statCdReduction: "Réd. Recharge",
       statCritical: "Critical",
+      debTakenPAtk: "ATK Phys. subie",
+      debTakenMAtk: "ATK Mag. subie",
+      debLightRes: "Résist. Lumière",
+      debDarkRes: "Résist. Ténèbres",
+      debIceRes: "Résist. Glace",
+      debFireRes: "Résist. Feu",
+      debCritRes: "Résist. Critique",
+      debRedPAtk: "Réduction ATK Phys.",
+      debRedMAtk: "Réduction ATK Mag.",
+      buffIncPDef: "Augm. DÉF Phys.",
+      buffIncMDef: "Augm. DÉF Mag.",
+      buffIncPAtk: "Augm. ATK Phys.",
+      buffIncMAtk: "Augm. ATK Mag.",
+      buffIncStr: "Augm. FOR",
+      buffIncAgi: "Augm. AGI",
+      buffIncInt: "Augm. INT",
+      buffIncVit: "Augm. VIT",
+      buffIncLight: "Augm. ATK Lumière",
+      buffIncDark: "Augm. ATK Ténèbres",
+      buffIncIce: "Augm. ATK Glace",
+      buffIncFire: "Augm. ATK Feu",
+      buffIncCrit: "Augm. Critique",
       statFinalDmg: "Amp. Dégâts Finaux",
     },
     "de": {
@@ -2148,7 +2463,7 @@
       importTitle: "Daten aus einer Datei importieren",
       addClass: "Klasse hinzufügen",
       menu: "Menü",
-      guide: "Guide",
+      guide: "Leitfaden",
       idioma: "Sprache",
       langPtBR: "Portugiesisch - Brasilien",
       langPtPT: "Portugiesisch - Portugal",
@@ -2162,14 +2477,25 @@
       langDe: "Deutsch",
       manual: "Handbuch",
       back: "Zurück",
-      guideJade: "Enhancement Jade",
-      guideSpirit: "Enhancement Spirit",
+      menuDescGuide: "Jade, Spirit, Rotation, Fortschritt und Raids.",
+      menuDescComp: "Stelle bis zu 8 Klassen zusammen und summiere ihre Buffs.",
+      menuDescParty: "Erstelle die beste Party aus den Backups der Spieler.",
+      menuDescLang: "Ändere die Sprache der Seite.",
+      menuDescManual: "Lerne Schritt für Schritt, die Seite zu nutzen.",
+      menuDescJade: "Anleitung zur Jade-Verbesserung.",
+      menuDescSpirit: "Anleitung zur Spirit-Verbesserung.",
+      menuDescRotation: "Inhalte, die sich täglich ändern.",
+      menuDescProgression: "Schritt für Schritt von Level 1 bis Endgame.",
+      menuDescRaid: "Phasen und Videos jeder Raid.",
+      menuDescRaidItem: "Phasen und Raid-Video.",
+      guideJade: "Jade-Verbesserung",
+      guideSpirit: "Spirit-Verbesserung",
       guideRotation: "Tägliche Rotation",
       guideProgression: "Spielfortschritt",
       guideRaid: "Raid",
-      raidDDN: "Desert Dragon",
-      raidRDN: "Red Dragon",
-      raidIDN: "Ice Dragon",
+      raidDDN: "Wüstendrache",
+      raidRDN: "Roter Drache",
+      raidIDN: "Eisdrache",
       raidIDNWip: "Wird gerade angepasst",
       raidFullVideo: "▶ Vollständiges Raid-Video",
       raidStageVideo: "▶ Video dieser Phase",
@@ -2330,6 +2656,28 @@
       statActSpeed: "Act. Speed",
       statCdReduction: "Abklingzeit-Red.",
       statCritical: "Critical",
+      debTakenPAtk: "Erlittene Phys. ATK",
+      debTakenMAtk: "Erlittene Mag. ATK",
+      debLightRes: "Lichtresistenz",
+      debDarkRes: "Dunkelresistenz",
+      debIceRes: "Eisresistenz",
+      debFireRes: "Feuerresistenz",
+      debCritRes: "Krit. Resistenz",
+      debRedPAtk: "Reduzierte Phys. ATK",
+      debRedMAtk: "Reduzierte Mag. ATK",
+      buffIncPDef: "Erhöhte Phys. DEF",
+      buffIncMDef: "Erhöhte Mag. DEF",
+      buffIncPAtk: "Erhöhte Phys. ATK",
+      buffIncMAtk: "Erhöhte Mag. ATK",
+      buffIncStr: "Erhöhte STR",
+      buffIncAgi: "Erhöhte AGI",
+      buffIncInt: "Erhöhte INT",
+      buffIncVit: "Erhöhte VIT",
+      buffIncLight: "Erhöhte Licht-ATK",
+      buffIncDark: "Erhöhte Dunkel-ATK",
+      buffIncIce: "Erhöhte Eis-ATK",
+      buffIncFire: "Erhöhte Feuer-ATK",
+      buffIncCrit: "Erhöhter Critical",
       statFinalDmg: "Amp. Final Damage",
     }
   };
@@ -5165,11 +5513,13 @@ const GUIDE_I18N = {
   // =========================================================
   // Weekly content-reset countdown
   // =========================================================
-  // ASSUMPTION: "Server Time" here is treated as UTC, since the app has no
-  // other defined reference for it. If the real server uses a different
-  // offset, adjust the two UTC calls below (day-of-week check + setUTCHours).
-  const RESET_WEEKDAY_UTC = 6; // Saturday (Date#getUTCDay(): 0=Sun ... 6=Sat)
-  const RESET_HOUR_UTC = 9;    // 09:00
+  // O reset semanal é no sábado às 04:00 de Brasília (GMT-3) = 09:00 de Server Time (UTC+2) = 07:00 UTC.
+  // (Mesmo horário usado pelo reset dos chips em app.js: RESET_HOUR = 4 em GMT-3.)
+  // Server Time aqui é UTC+2, igual ao SERVER_TZ_OFFSET_MS de app.js; os cálculos são feitos em UTC.
+  const SERVER_UTC_OFFSET_H = 2;                              // Server Time = UTC+2
+  const RESET_WEEKDAY_UTC = 6;                                // sábado (Date#getUTCDay(): 0=dom ... 6=sáb)
+  const RESET_HOUR_SERVER = 9;                                // 09:00 Server Time (= 04:00 Brasília)
+  const RESET_HOUR_UTC = RESET_HOUR_SERVER - SERVER_UTC_OFFSET_H; // 07:00 UTC
 
   function getNextWeeklyResetUTC(now) {
     const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), RESET_HOUR_UTC, 0, 0, 0));

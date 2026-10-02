@@ -112,11 +112,11 @@ function renderClassNickLabel(labelEl, cls, nickname) {
 
   const nameSpan = document.createElement("span");
   nameSpan.className = "class-nickname-name";
-  nameSpan.textContent = `"${nickname}"`;
+  nameSpan.textContent = nickname;
 
   labelEl.appendChild(classSpan);
   labelEl.appendChild(nameSpan);
-  labelEl.title = `${className} "${nickname}"`; // nome completo ao passar o mouse (caso seja truncado)
+  labelEl.title = `${nickname} · ${className}`; // nome completo ao passar o mouse (caso seja truncado)
   labelEl.classList.toggle("nick-long", `${className} ${nickname}`.length >= 14);
 }
 window.renderClassNickLabel = renderClassNickLabel;
@@ -175,23 +175,25 @@ const CLASS_COMP_DATA = {
 // O segundo item de cada par é a chave de tradução (window.TRANSLATIONS),
 // não mais o texto fixo em português — renderCompStatGrid busca o rótulo
 // no idioma atual via i18n(), com o texto em pt-BR como fallback.
+// Quarto item opcional: "+" = status positivo (sinal +), padrão = negativo (sinal -).
+// Ordem: negativos nas linhas de cima, positivos na linha de baixo.
 const COMP_DEBUFF_FIELDS = [
-  ["pdef",  "statPDef", "DEF Física"],       ["mdef",  "statMDef", "DEF Mágica"],
-  ["patk",  "statPAtk", "ATK Físico"],       ["matk",  "statMAtk", "ATK Mágico"],
-  ["light", "statLight", "Luz"],             ["dark",  "statDark", "Trevas"],
-  ["ice",   "statIce", "Gelo"],              ["fire",  "statFire", "Fogo"],
-  ["resist","statResistCrit", "Resist. Crítico"],["critdmg","statCritDmg", "Dano Crítico"],
-  ["icestack","statIceAmp", "Amp. Gelo"]
+  ["light",   "debLightRes", "Resist. Luz"],    ["dark",    "debDarkRes", "Resist. Trevas"],
+  ["ice",     "debIceRes",   "Resist. Gelo"],   ["fire",    "debFireRes", "Resist. Fogo"],
+  ["resist",  "debCritRes",  "Resist. Crítica"],  ["critdmg", "statCritDmg", "Dano Crítico"],
+  ["patk",    "debRedPAtk",  "Redução ATK Físico"],["matk",    "debRedMAtk", "Redução ATK Mágico"],
+  ["pdef",    "debTakenPAtk", "ATK Físico Recebido", "+"], ["mdef", "debTakenMAtk", "ATK Mágico Recebido", "+"],
+  ["icestack","statIceAmp",  "Amp. Gelo"]
 ];
 const COMP_BUFF_FIELDS = [
-  ["pdef", "statPDef", "DEF Física"],        ["mdef", "statMDef", "DEF Mágica"],
-  ["patk", "statPAtk", "ATK Físico"],        ["matk", "statMAtk", "ATK Mágico"],
-  ["str",  "statStr", "Força"],              ["agi",  "statAgi", "Agilidade"],
-  ["int",  "statInt", "Inteligência"],       ["vit",  "statVit", "Vitality"],
-  ["light","statLight", "Luz"],              ["dark", "statDark", "Trevas"],
-  ["ice", "statIce", "Gelo"],                ["fire", "statFire", "Fogo"],
-  ["mvspeed", "statMoveSpeed", "Mov. Speed"],["acspeed", "statActSpeed", "Act. Speed"],
-  ["cd", "statCdReduction", "Red. Recarga"], ["crit", "statCritical", "Critical"],
+  ["pdef", "buffIncPDef", "Aumento DEF Física"],  ["mdef", "buffIncMDef", "Aumento DEF Mágica"],
+  ["patk", "buffIncPAtk", "Aumento ATK Físico"],  ["matk", "buffIncMAtk", "Aumento ATK Mágico"],
+  ["str",  "buffIncStr",  "Aumento FOR"],         ["agi",  "buffIncAgi",  "Aumento AGI"],
+  ["int",  "buffIncInt",  "Aumento INT"],         ["vit",  "buffIncVit",  "Aumento VIT"],
+  ["light","buffIncLight","Aumento ATK Luz"],  ["dark", "buffIncDark", "Aumento ATK Trevas"],
+  ["ice",  "buffIncIce",  "Aumento ATK Gelo"], ["fire", "buffIncFire", "Aumento ATK Fogo"],
+  ["crit", "buffIncCrit", "Aumento Crítico"],     ["cd", "statCdReduction", "Red. Recarga"],
+  ["mvspeed", "statMoveSpeed", "Mov. Speed"],        ["acspeed", "statActSpeed", "Act. Speed"],
   ["fd", "statFinalDmg", "Amp. Final Damage"]
 ];
 const COMP_SLOTS_KEY = "dnOriginsCompMaker";
@@ -518,10 +520,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderCompStatGrid(container, fields, totals, opts) {
     container.innerHTML = "";
-    fields.forEach(([key, labelKey, labelFallback]) => {
+    let positiveStarted = false;
+    fields.forEach(([key, labelKey, labelFallback, sign]) => {
       const val = totals[key] || 0;
       const cell = document.createElement("div");
       cell.className = "comp-stat-cell" + (val ? " comp-stat-cell-active" : "");
+      const isPositive = sign === "+";
+      // Primeiro status positivo sempre começa na coluna 1 (nova linha), separando dos negativos.
+      if (isPositive && !positiveStarted) { cell.style.gridColumnStart = "1"; }
+      if (isPositive) positiveStarted = true;
       const labelEl = document.createElement("span");
       labelEl.className = "comp-stat-label";
       labelEl.textContent = i18n(labelKey, labelFallback);
@@ -529,7 +536,7 @@ document.addEventListener("DOMContentLoaded", () => {
       valueEl.className = "comp-stat-value";
       const rounded = Math.round(val * 100) / 100;
       let text;
-      if (opts && opts.isDebuff) {
+      if (opts && opts.isDebuff && !isPositive) {
         text = (rounded ? "-" : "") + rounded + "%";
       } else {
         text = (rounded > 0 ? "+" : "") + rounded + "%";
@@ -1014,24 +1021,29 @@ const EVENT_CONTENTS = [
   {
     id: "crazy-duck-nest",
     labels: { en: "Crazy Duck Nest" },
-    until: "2026-10-04T22:00:00Z"   // fim: 5 de outubro 00:00 Server Time (= 04/10 22:00 UTC)
+    until: "2026-10-05T07:00:00Z"   // fim: 5 de outubro 09:00 Server Time = 04:00 Brasília (= 05/10 07:00 UTC)
     // sem "days": roda todo dia
   },
   {
     id: "althea-continent-exploration",
     labels: { en: "Althea Continent Exploration" },
     until: "2026-10-10T07:00:00Z", // fim: 10 de outubro 09:00 Server Time (= 10/10 07:00 UTC)
-    days: [5, 6, 0]                 // só sex/sáb/dom, contados em Server Time (ver isEventActiveNow)
+    days: [5, 6, 0]                 // sex/sáb/dom, com o dia virando às 04:00 de Brasília = 09:00 Server Time (ver isEventActiveNow)
   }
 ];
 
 // Está dentro do período (until) E, se o evento só roda em certos dias (days, índices
-// JS: domingo=0...sábado=6), hoje é um desses dias — contado em SERVER TIME, não no
-// horário local de quem está vendo a tela.
+// JS: domingo=0...sábado=6), hoje é um desses dias.
+// O "dia" do evento NÃO começa à meia-noite: começa no reset diário do jogo, 04:00 de Brasília
+// (GMT-3) = 09:00 de Server Time. Ou seja, um evento de sexta só aparece a partir de sexta 04:00
+// (Brasília) e não na quinta à noite, quando o relógio do servidor já virou para sexta.
+// Funciona igual em qualquer fuso de quem está vendo a tela.
+const EVENT_DAY_START_MS = 9 * 60 * 60 * 1000;   // 09:00 Server Time = 04:00 Brasília
 function isEventActiveNow(ev, nowMs) {
   if (ev.until && Date.parse(ev.until) <= nowMs) return false;
   if (ev.days && ev.days.length) {
-    const dow = new Date(nowMs + SERVER_TZ_OFFSET_MS).getUTCDay();
+    // Server Time deslocado -9h: os getters UTC passam a mostrar o "dia do jogo" (vira às 09:00 do servidor)
+    const dow = new Date(nowMs + SERVER_TZ_OFFSET_MS - EVENT_DAY_START_MS).getUTCDay();
     if (!ev.days.includes(dow)) return false;
   }
   return true;
@@ -1117,12 +1129,24 @@ function getEventEmptyText() {
   return EVENT_EMPTY_TEXT[getCurrentLang()] || EVENT_EMPTY_TEXT.en;
 }
 
+// Os patch notes dão a data de fim como 00:00 de Server Time (UTC+2 = 22:00 UTC do dia anterior).
+// Mas o "dia" do jogo vira às 09:00 Server Time = 04:00 Brasília, então o evento só termina nesse
+// horário. Se o "until" cair exatamente em 00:00 do servidor, empurra para 09:00 do servidor.
+function normalizeEventUntil(until) {
+  if (!until) return null;
+  const ms = Date.parse(until);
+  if (!isFinite(ms)) return until;
+  const serverMs = ms + SERVER_TZ_OFFSET_MS;
+  if (serverMs % DAY_MS === 0) return new Date(ms + EVENT_DAY_START_MS).toISOString();
+  return until;
+}
+
 // Troca a lista de eventos em uso (mantém o mesmo array, que é lido em vários lugares).
 function setEventList(list) {
   EVENT_CONTENTS.splice(0, EVENT_CONTENTS.length, ...list.map((e) => ({
     id: e.id,
     labels: e.labels || { en: e.name || e.id },
-    until: e.until || null,
+    until: normalizeEventUntil(e.until),
     days: Array.isArray(e.days) && e.days.length ? e.days : undefined
   })));
 }
@@ -2759,17 +2783,36 @@ document.addEventListener("DOMContentLoaded", () => {
     if (SHOT_SKIP_TAGS.has(el.tagName)) return true;
     if (el.hasAttribute && el.hasAttribute("data-html2canvas-ignore")) return true;
     if (el.classList && el.classList.contains("hidden")) return true;
+    // Face oculta da coluna de conteúdo (Class ⇄ Event): o verso é absolute e não define a altura da célula,
+    // então quando não está visível não precisa ser clonado (metade dos nós a menos = captura bem mais leve).
+    if (el.classList && el.classList.contains("content-face-back") &&
+        !document.documentElement.classList.contains("events-view")) return true;
     return false;
   };
   const shotFilter = (node) => !shotSkip(node);
-  // Escalas de captura: alvo 4K (largura 3840 px), limitado pelo tamanho máximo de canvas dos navegadores.
+  // Mapa de ícones embutidos (js/class-icons.js): procura o nome exato e, se não achar, ignorando maiúsculas/minúsculas
+  const lookupClassIcon = (map, name) => {
+    if (!map || !name) return null;
+    if (map[name]) return map[name];
+    const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, "");   // "Dark Avenger" = "darkavenger"
+    const n = norm(name);
+    for (const k in map) if (norm(k) === n) return map[k];
+    return null;
+  };
+  // Escalas de captura: alvo 1080p (largura 1920 px). Menos pixels = o navegador codifica o PNG quase na hora,
+  // sem prender a tela. Limita também o total de pixels (páginas muito altas) e tenta escala 1 se a primeira falhar.
+  // Qualidade: alvo 2x (largura ~3840 px) para o zoom ficar nítido; o teto de pixels protege páginas muito altas
+  // e, se a escala alta falhar, tenta 1.5x e depois 1x antes de desistir.
+  const SHOT_TARGET_W = 3840;   // 4K (UHD): a imagem final sai com 3840 px de largura
+  const SHOT_MAX_PIXELS = 36e6; // teto de segurança (memória do navegador) para páginas muito altas
   const computeShotScales = () => {
     const w = Math.max(document.body.scrollWidth, document.documentElement.clientWidth) || 1;
     const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) || 1;
-    let t = Math.max(window.devicePixelRatio || 1, 3840 / w);
-    t = Math.max(1, Math.min(t, 16000 / w, 16000 / h, Math.sqrt(120e6 / (w * h))));
+    let t = SHOT_TARGET_W / w;
+    t = Math.max(1, Math.min(t, 3, Math.sqrt(SHOT_MAX_PIXELS / (w * h))));
     const list = [t];
     if (t > 2) list.push(2);
+    if (t > 1.5) list.push(1.5);
     if (t > 1) list.push(1);
     return list;
   };
@@ -2786,23 +2829,70 @@ document.addEventListener("DOMContentLoaded", () => {
       ".content-flip-inner{transform:none!important;transition:none!important;transform-style:flat!important}" +
       ".content-face{backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
       ".content-face-back{transform:none!important}" +
+      // sem animações/transições durante a captura: o navegador não recalcula estilos animados enquanto clona
+      "*,*::before,*::after{animation-play-state:paused!important;transition:none!important}" +
+      // Ícone de classe: na clonagem, will-change/backface-visibility + sombra neon geram um "fantasma" roxo borrado
+      // fora do lugar e o ícone some. Durante a captura vira uma caixa simples com a mesma borda neon (sem sombra).
+      ".class-cell-wrapper,.btn-gear-mini,.btn-add-content-mini,.btn-remove-row,.gear-bubble,.class-nickname{will-change:auto!important;backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+      ".class-cell-wrapper{box-shadow:none!important;border:1px solid rgba(184,129,252,.8)!important}" +
+      ".class-cell-wrapper img{display:block!important;opacity:1!important;visibility:visible!important}" +
       (eventsView ? ".content-face-front{visibility:hidden!important}" : ".content-face-back{visibility:hidden!important}");
     document.head.appendChild(st);
+    // Ícones/imagens do próprio site: troca o src por data URL (cache) ANTES de capturar e espera decodificar.
+    // Assim o ícone de classe já está pronto e embutido quando o html-to-image clona a página (antes ele
+    // podia clonar a <img> ainda sem pixels e o ícone saía vazio). O src original é restaurado no final.
+    const swapped = [];
+    try {
+      const imgs = Array.from(document.querySelectorAll("#tablesWrapper img, .class-cell-wrapper img"));
+      await Promise.all(imgs.map(async (img) => {
+        try {
+          const raw = img.getAttribute("src") || "";
+          if (!raw || /^(data|blob):/i.test(raw)) return;
+          const u = new URL(raw, location.href);
+          if (u.origin !== location.origin) return;
+          let p = shotImgCache.get(u.href);
+          if (!p) {
+            p = fetch(u.href).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
+              .then((bl) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(bl); }));
+            shotImgCache.set(u.href, p);
+          }
+          let data;
+          try { data = await p; } catch (e) {
+            shotImgCache.delete(u.href);
+            // fetch falhou: reaproveita a imagem já carregada na tela, desenhando-a num canvas
+            if (!img.complete || !img.naturalWidth) throw e;
+            const cv = document.createElement("canvas");
+            cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+            cv.getContext("2d").drawImage(img, 0, 0);
+            data = cv.toDataURL("image/png");
+          }
+          swapped.push([img, raw, img.getAttribute("srcset")]);
+          img.removeAttribute("srcset");
+          img.src = data;
+          if (img.decode) await img.decode().catch(() => {});
+        } catch (err) { console.warn("Screenshot: não consegui embutir a imagem " + (img.getAttribute("src") || ""), err); }
+      }));
+      console.info("Screenshot (rápido): " + swapped.length + "/" + imgs.length + " imagens embutidas");
+    } catch (_) {}
     try {
       if (shotFontCSS === null) {
         try { shotFontCSS = await htmlToImage.getFontEmbedCSS(document.body, { filter: shotFilter }); } catch (_) { shotFontCSS = ""; }
       }
       for (const sc of computeShotScales()) {
         try {
+          await new Promise((r) => setTimeout(r, 0));   // devolve o controle ao navegador (a tela respira entre tentativas)
           const b = await htmlToImage.toBlob(document.body, {
-            pixelRatio: sc, backgroundColor: "#0c0908", cacheBust: false, filter: shotFilter,
+            pixelRatio: sc, backgroundColor: "#09090d", cacheBust: false, filter: shotFilter,
             fontEmbedCSS: shotFontCSS || undefined
           });
           if (b && b.size > 2000) return b;
         } catch (err) { console.warn("Screenshot (html-to-image) falhou em escala " + sc + ":", err); }
       }
       return null;
-    } finally { st.remove(); }
+    } finally {
+      st.remove();
+      swapped.forEach(([img, raw, srcset]) => { img.src = raw; if (srcset) img.setAttribute("srcset", srcset); });
+    }
   };
   // Aquece o que dá para preparar antes do clique (biblioteca + CSS das fontes), para o print sair sem espera
   const warmShot = () => {
@@ -2822,6 +2912,9 @@ document.addEventListener("DOMContentLoaded", () => {
       e.stopPropagation();
       if (shotBusy) return;
       shotBusy = true;
+      screenshotBtn.classList.remove("is-clicked");
+      void screenshotBtn.offsetWidth;                 // reinicia a animação da linha
+      screenshotBtn.classList.add("is-clicked", "is-busy");
       try {
         // Feedback imediato (flash), sem aviso de espera; o flash não entra no print
         const flash = document.createElement("div");
@@ -2829,11 +2922,13 @@ document.addEventListener("DOMContentLoaded", () => {
         flash.setAttribute("data-html2canvas-ignore", "");
         document.body.appendChild(flash);
         setTimeout(() => flash.remove(), 500);
-        await new Promise((r) => requestAnimationFrame(() => r()));
+        // Dois frames + um tick: o botão/flash pintam ANTES do trabalho pesado, então a tela não "congela" no clique
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 0))));
 
         let blob = null;
         let simplified = false;
         let lastErr = null;
+        let shotMissing = 0;   // imagens que ficaram de fora do print (plano B em file:// sem js/class-icons.js)
         // Em file:// o navegador bloqueia a leitura de imagens/CSS: o método rápido falharia sempre (e só gastaria
         // tempo), então vai direto para o plano B (versão sem imagens).
         if (location.protocol !== "file:") {
@@ -2842,6 +2937,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!blob) {
         // Plano B: html2canvas (mais lento)
+        console.info("Screenshot: usando o plano B (html2canvas)" + (DNO_IS_FILE ? " — site aberto por file://" : "") +
+          "");
         if (typeof html2canvas === "undefined") {
           await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
         }
@@ -2849,27 +2946,22 @@ document.addEventListener("DOMContentLoaded", () => {
         // Opções comuns. allowTaint fica desligado; vídeos (iframe) e elementos marcados com
         // data-html2canvas-ignore não entram na captura.
         const baseOptions = {
-          backgroundColor: "#0c0908",
+          backgroundColor: "#09090d",
           useCORS: true,
           allowTaint: false,
           logging: false,
           ignoreElements: (el) => shotSkip(el)
         };
 
-        // Qualidade 4K: a captura é renderizada em escala maior que a tela (largura alvo de 3840 px), para o
-        // texto e os traços continuarem nítidos ao dar zoom. Limita a escala pelo tamanho máximo de canvas dos
-        // navegadores e, se a captura falhar ou sair vazia, tenta de novo com escalas menores.
+        // Qualidade 1080p: a captura sai com largura alvo de 1920 px (leve e rápida). Se a captura falhar ou sair
+        // vazia, tenta de novo com escala 1.
         const bodyW = Math.max(document.body.scrollWidth, document.documentElement.clientWidth) || 1;
         const bodyH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) || 1;
-        // Em file:// só o plano B (html2canvas, bem mais pesado) roda: resolução intermediária (largura ~2560 px, ou o
-        // devicePixelRatio da tela, o que for maior) para a tela não prender. Com servidor (Netlify / netlify dev)
-        // o método rápido usa 3840 px (4K).
-        const legacyWidth = DNO_IS_FILE ? 2560 : 3840;
-        let target = Math.max(window.devicePixelRatio || 1, legacyWidth / bodyW);
-        target = Math.min(target, 16000 / bodyW, 16000 / bodyH, Math.sqrt(120e6 / (bodyW * bodyH)));
-        target = Math.max(1, target);
+        // Plano B (html2canvas) também em 1080p (largura 1920 px), igual ao método rápido.
+        let target = SHOT_TARGET_W / bodyW;
+        target = Math.max(1, Math.min(target, 3, Math.sqrt(SHOT_MAX_PIXELS / (bodyW * bodyH))));
         const scales = [target];
-        if (target > 2) scales.push(2);
+        if (target > 1.5) scales.push(1.5);
         if (target > 1) scales.push(1);
         let shotScale = target;
 
@@ -2884,6 +2976,11 @@ document.addEventListener("DOMContentLoaded", () => {
             ".content-flip-inner{transform:none!important;transition:none!important;transform-style:flat!important;will-change:auto!important}" +
             ".content-face{backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
             ".content-face-back{transform:none!important}" +
+            // html2canvas não sabe desenhar box-shadow com blur: a sombra neon do ícone de classe vira um bloco roxo
+            // sólido e deslocado (o "borrão roxo"). Na cópia o ícone fica com borda neon simples, sem sombra.
+            ".class-cell-wrapper{box-shadow:none!important;border:1px solid rgba(184,129,252,.8)!important;will-change:auto!important;backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+            ".btn-gear-mini,.btn-add-content-mini,.btn-remove-row,.gear-bubble,.class-nickname{will-change:auto!important;backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+            "*,*::before,*::after{animation:none!important;transition:none!important}" +
             (eventsView ? ".content-face-front{visibility:hidden!important}" : ".content-face-back{visibility:hidden!important}");
           doc.head.appendChild(st);
         };
@@ -2891,7 +2988,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Imagens do próprio site (ícones de classe, skills...) viram data URL na cópia: assim entram na captura
         // sem depender de CORS nem "contaminar" o canvas. Imagens de outro domínio são retiradas.
         // Em file:// o navegador não deixa ler nenhum arquivo local. Para os ícones de classe saírem mesmo assim,
-        // usa o mapa js/class-icons.js (gerado por build-class-icons.mjs) com os PNGs já em data URL.
+        // usa o mapa js/class-icons.js (opcional) com os PNGs já em data URL.
         const inlineImages = async (doc) => {
           const iconMap = window.DNO_CLASS_ICONS || null;
           const imgs = Array.from(doc.querySelectorAll("img"));
@@ -2902,10 +2999,11 @@ document.addEventListener("DOMContentLoaded", () => {
               if (u.protocol === "data:" || u.protocol === "blob:") return;
               const mm = /\/img\/classes\/([^\/?#]+)\.png$/i.exec(u.pathname);
               if (mm && iconMap) {
-                const data = iconMap[decodeURIComponent(mm[1])];
+                const data = lookupClassIcon(iconMap, decodeURIComponent(mm[1]));
                 if (data) { img.removeAttribute("srcset"); img.src = data; return; }
+                console.warn("Screenshot: ícone sem entrada em js/class-icons.js: " + decodeURIComponent(mm[1]));
               }
-              if (u.protocol === "file:") { img.remove(); return; }   // qualquer outra imagem local contaminaria o canvas
+              if (u.protocol === "file:") { shotMissing++; img.remove(); return; }   // qualquer outra imagem local contaminaria o canvas
               if (u.origin !== location.origin) { img.remove(); return; }
               href = u.href;
               let p = shotImgCache.get(href);
@@ -2988,12 +3086,6 @@ document.addEventListener("DOMContentLoaded", () => {
         // Em file:// qualquer imagem lida do disco contamina o canvas; por isso só entram os ícones embutidos
         // (js/class-icons.js) e, se mesmo assim o canvas ficar contaminado, cai na versão simplificada.
         simplified = false;
-        // Em file:// carrega o mapa de ícones (se existir) para os ícones de classe entrarem no print
-        if (DNO_IS_FILE && !window.DNO_CLASS_ICONS) { try { await loadScript("js/class-icons.js"); } catch (_) {} }
-        if (DNO_IS_FILE && !window.DNO_CLASS_ICONS) {
-          console.warn("Screenshot: js/class-icons.js não encontrado, então os ícones de classe não entram no print em file://. " +
-            "Rode `node build-class-icons.mjs` na pasta do projeto, ou abra o site por `node serve.mjs`.");
-        }
         let canvas = null;
         for (const sc of scales) {
           shotScale = sc;
@@ -3024,9 +3116,13 @@ document.addEventListener("DOMContentLoaded", () => {
           copied = true;
         } catch (_) {}
 
-        const note = simplified ? i18n("toastNoImages", " (versão sem imagens — abra pelo site publicado para incluir os ícones)") : "";
+        let note = simplified ? i18n("toastNoImages", " (versão sem imagens — abra pelo site publicado para incluir os ícones)") : "";
+        if (!simplified && shotMissing > 0) {
+          note = " ⚠ " + shotMissing + " ícone(s) ficaram de fora: o navegador bloqueia imagens locais (file://). Abra pelo site publicado no Netlify.";
+          console.warn("Screenshot: " + shotMissing + " imagem(ns) local(is) removida(s) do print (file://). Use o site publicado.");
+        }
         if (copied) {
-          showToast(i18n("toastCopied", "📋 Screenshot copiado para a área de transferência!") + note);
+          showToast(i18n("toastCopied", "📋 Screenshot copiado para a área de transferência!") + note, note ? 9000 : 0);
         } else {
           // Fallback: download
           const url = URL.createObjectURL(blob);
@@ -3035,13 +3131,15 @@ document.addEventListener("DOMContentLoaded", () => {
           a.download = `dragon-nest-ccc-${new Date().toISOString().slice(0,10)}.png`;
           a.click();
           URL.revokeObjectURL(url);
-          showToast(i18n("toastSaved", "📥 Screenshot salvo como arquivo!") + note);
+          showToast(i18n("toastSaved", "📥 Screenshot salvo como arquivo!") + note, note ? 9000 : 0);
         }
       } catch (err) {
         showToast(i18n("toastError", "⚠️ Não foi possível capturar a tela: ") + (err && err.name ? err.name : "erro"));
         console.error("Screenshot error:", err);
       } finally {
         shotBusy = false;
+        screenshotBtn.classList.remove("is-busy");
+        setTimeout(() => screenshotBtn.classList.remove("is-clicked"), 600);
       }
     });
   }
@@ -3056,13 +3154,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function showToast(msg) {
+  function showToast(msg, ms) {
     const t = document.createElement("div");
     t.className = "screenshot-toast";
     t.setAttribute("data-html2canvas-ignore", "");   // o aviso não aparece dentro do print
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 2600);
+    setTimeout(() => t.remove(), ms || 2600);
     return t;
   }
   window.showToast = showToast;
@@ -6413,7 +6511,14 @@ document.addEventListener("DOMContentLoaded", () => {
   closeBtn.addEventListener("click", close);
   // clicar no fundo escuro fecha (inclui a folga entre o modal e o painel de histórico)
   const layoutEl = document.getElementById("apLayout");
-  overlay.addEventListener("click", (e) => { if (e.target === overlay || e.target === layoutEl) close(); });
+  // Qualquer clique que não caia dentro de um painel (modal, histórico, janela de convite) fecha.
+  // A checagem por "closest" cobre também as folgas/padding do layout. Elementos que saíram do DOM
+  // durante o clique (re-render de lista) são ignorados para não fechar sem querer.
+  overlay.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!t || !t.isConnected) return;
+    if (t === overlay || t === layoutEl || !t.closest(".guide-modal, .ap-invite-panel, .ap-invite-backdrop")) close();
+  });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || overlay.classList.contains("hidden")) return;
     if (invitePanelOpen()) closeInvitePanel(); else close();   // Esc fecha primeiro a janela de convite

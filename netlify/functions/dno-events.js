@@ -22,6 +22,9 @@ const WEEKDAYS = {
 // (GMT-3) → Server Time = UTC+2, fixo (o jogo não observa horário de verão).
 const SERVER_TZ_OFFSET_MS = 2 * 60 * 60 * 1000;
 
+// Reset diário do jogo: 09:00 Server Time = 04:00 de Brasília (GMT-3).
+const RESET_HOUR_SERVER = 9;
+
 async function get(url) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);
@@ -60,7 +63,11 @@ function parseEndDate(text, publishedIso) {
   if (month === undefined) return null;
   const pub = publishedIso ? new Date(publishedIso) : new Date();
   let year = m[3] ? Number(m[3]) : pub.getUTCFullYear();
-  const day = Number(m[1]), hh = Number(m[4] || 0), mm = Number(m[5] || 0);
+  const day = Number(m[1]);
+  let hh = Number(m[4] || 0), mm = Number(m[5] || 0);
+  // O dia do jogo vira às 09:00 Server Time (= 04:00 Brasília). Uma data de fim à meia-noite do
+  // servidor (ou sem hora) vale, na prática, até esse reset: 09:00 Server Time.
+  if (hh === 0 && mm === 0) hh = RESET_HOUR_SERVER;
   let d = new Date(Date.UTC(year, month, day, hh, mm) - SERVER_TZ_OFFSET_MS);
   if (!m[3] && d.getTime() < pub.getTime() - 24 * 3600 * 1000) {
     d = new Date(Date.UTC(year + 1, month, day, hh, mm) - SERVER_TZ_OFFSET_MS);
