@@ -2816,6 +2816,40 @@ document.addEventListener("DOMContentLoaded", () => {
     if (t > 1) list.push(1);
     return list;
   };
+  // ---- Fontes no print ----
+  // Antes: se a 1ª tentativa de embutir as fontes falhasse (ou rodasse antes do Google Fonts terminar de carregar),
+  // o resultado vazio ficava em cache para sempre e todos os prints saíam com fonte genérica (Segoe/serif).
+  // Agora: só guarda em cache quando deu certo; espera document.fonts.ready; e, se o html-to-image não conseguir,
+  // monta o CSS das fontes por conta própria (baixa o CSS do Google Fonts + cada .woff2 e converte em data URL).
+  const hasEmbeddedFonts = (css) => /@font-face/i.test(css || "") && /url\(\s*["']?data:/i.test(css);
+  const blobToDataURL = (bl) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(bl); });
+  const buildGoogleFontCSS = async () => {
+    const links = Array.from(document.querySelectorAll('link[rel="stylesheet"][href*="fonts.googleapis.com"]'));
+    const URL_RE = /url\((["']?)(https?:[^)"']+)\1\)/g;
+    let out = "";
+    for (const l of links) {
+      let css = await (await fetch(l.href)).text();
+      const urls = Array.from(new Set(Array.from(css.matchAll(URL_RE)).map((m) => m[2])));
+      const map = {};
+      await Promise.all(urls.map(async (u) => {
+        try { map[u] = await blobToDataURL(await (await fetch(u)).blob()); } catch (e) { console.warn("Screenshot: fonte não baixou", u, e); }
+      }));
+      out += css.replace(URL_RE, (all, q, u) => (map[u] ? 'url("' + map[u] + '")' : all)) + "\n";
+    }
+    return out;
+  };
+  const getShotFontCSS = async () => {
+    if (shotFontCSS) return shotFontCSS;
+    try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (_) {}
+    let css = "";
+    try { css = await htmlToImage.getFontEmbedCSS(document.body, { filter: shotFilter }); } catch (e) { console.warn("Screenshot: getFontEmbedCSS falhou", e); }
+    if (!hasEmbeddedFonts(css)) {
+      try { css = await buildGoogleFontCSS(); } catch (e) { console.warn("Screenshot: fontes manuais falharam", e); }
+    }
+    if (hasEmbeddedFonts(css)) shotFontCSS = css;
+    else console.warn("Screenshot: fontes NÃO embutidas — o print vai sair com a fonte padrão");
+    return css;
+  };
   // Captura rápida com html-to-image: usa o próprio motor do navegador (mantém ícones e SVGs) e é bem mais
   // leve que o html2canvas. Se falhar, o caminho antigo (html2canvas) assume.
   const captureFast = async () => {
@@ -2834,7 +2868,9 @@ document.addEventListener("DOMContentLoaded", () => {
       // Ícone de classe: na clonagem, will-change/backface-visibility + sombra neon geram um "fantasma" roxo borrado
       // fora do lugar e o ícone some. Durante a captura vira uma caixa simples com a mesma borda neon (sem sombra).
       ".class-cell-wrapper,.btn-gear-mini,.btn-add-content-mini,.btn-remove-row,.gear-bubble,.class-nickname{will-change:auto!important;backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
-      ".class-cell-wrapper{box-shadow:none!important;border:1px solid rgba(184,129,252,.8)!important}" +
+      // Neon roxo do ícone de volta no print (mesmos valores do style.css). O "fantasma" borrado vinha de will-change +
+      // backface-visibility junto com a sombra; como essas duas já são neutralizadas acima, a sombra pode voltar.
+      ".class-cell-wrapper{box-shadow:0 0 0 1px rgba(184,129,252,.18),0 0 8px 1px rgba(184,129,252,.45),0 0 16px 2px rgba(184,129,252,.22),inset 0 0 8px rgba(184,129,252,.18)!important;border:1px solid rgba(184,129,252,.55)!important;transform:none!important;filter:none!important}" +
       ".class-cell-wrapper img{display:block!important;opacity:1!important;visibility:visible!important}" +
       (eventsView ? ".content-face-front{visibility:hidden!important}" : ".content-face-back{visibility:hidden!important}");
     document.head.appendChild(st);
@@ -2875,15 +2911,13 @@ document.addEventListener("DOMContentLoaded", () => {
       console.info("Screenshot (rápido): " + swapped.length + "/" + imgs.length + " imagens embutidas");
     } catch (_) {}
     try {
-      if (shotFontCSS === null) {
-        try { shotFontCSS = await htmlToImage.getFontEmbedCSS(document.body, { filter: shotFilter }); } catch (_) { shotFontCSS = ""; }
-      }
+      const fontCSS = await getShotFontCSS();
       for (const sc of computeShotScales()) {
         try {
           await new Promise((r) => setTimeout(r, 0));   // devolve o controle ao navegador (a tela respira entre tentativas)
           const b = await htmlToImage.toBlob(document.body, {
             pixelRatio: sc, backgroundColor: "#09090d", cacheBust: false, filter: shotFilter,
-            fontEmbedCSS: shotFontCSS || undefined
+            fontEmbedCSS: fontCSS || undefined
           });
           if (b && b.size > 2000) return b;
         } catch (err) { console.warn("Screenshot (html-to-image) falhou em escala " + sc + ":", err); }
@@ -2899,10 +2933,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const go = async () => {
       try {
         if (typeof htmlToImage === "undefined") await loadScript(HTI_SRC);
-        if (shotFontCSS === null && typeof htmlToImage !== "undefined") {
-          shotFontCSS = await htmlToImage.getFontEmbedCSS(document.body, { filter: shotFilter });
-        }
-      } catch (_) { shotFontCSS = shotFontCSS === null ? null : shotFontCSS; }
+        if (!shotFontCSS && typeof htmlToImage !== "undefined") await getShotFontCSS();
+      } catch (_) { /* tenta de novo no clique */ }
     };
     if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 4000 }); else setTimeout(go, 2500);
   };
@@ -2915,6 +2947,18 @@ document.addEventListener("DOMContentLoaded", () => {
       screenshotBtn.classList.remove("is-clicked");
       void screenshotBtn.offsetWidth;                 // reinicia a animação da linha
       screenshotBtn.classList.add("is-clicked", "is-busy");
+      // Clipboard: o ClipboardItem é criado AGORA (dentro do gesto do clique) com uma Promise do PNG. Antes a
+      // gravação só era tentada depois da captura (vários segundos); o Brave/Chrome já tinham expirado o gesto
+      // do usuário e negavam a cópia. Se a cópia não for possível, cai no download como antes.
+      let resolveBlob, rejectBlob, clipPromise = null;
+      const blobPromise = new Promise((res, rej) => { resolveBlob = res; rejectBlob = rej; });
+      blobPromise.catch(() => {});
+      try {
+        if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== "undefined") {
+          clipPromise = navigator.clipboard.write([new ClipboardItem({ "image/png": blobPromise })]);
+          clipPromise.catch(() => {});
+        }
+      } catch (_) { clipPromise = null; }
       try {
         // Feedback imediato (flash), sem aviso de espera; o flash não entra no print
         const flash = document.createElement("div");
@@ -3111,10 +3155,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Try clipboard first, fallback to download
         let copied = false;
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-          copied = true;
-        } catch (_) {}
+        resolveBlob(blob);
+        if (clipPromise) { try { await clipPromise; copied = true; } catch (err) { console.warn("Screenshot: clipboard negado, vai baixar o arquivo", err); } }
 
         let note = simplified ? i18n("toastNoImages", " (versão sem imagens — abra pelo site publicado para incluir os ícones)") : "";
         if (!simplified && shotMissing > 0) {
@@ -3134,6 +3176,7 @@ document.addEventListener("DOMContentLoaded", () => {
           showToast(i18n("toastSaved", "📥 Screenshot salvo como arquivo!") + note, note ? 9000 : 0);
         }
       } catch (err) {
+        rejectBlob(err);
         showToast(i18n("toastError", "⚠️ Não foi possível capturar a tela: ") + (err && err.name ? err.name : "erro"));
         console.error("Screenshot error:", err);
       } finally {
@@ -5412,6 +5455,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // vez. Em vez de repetir esse comportamento quebrado, avisamos e não
     // ativamos — o botão "Exportar" continua disponível para salvar na hora.
     if (turningOn && !supportsFsAccess) {
+      // Brave desliga a File System Access API por padrão (é ela que permite gravar sempre no mesmo arquivo).
+      const isBrave = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
+      if (isBrave && window.showToast) {
+        window.showToast(
+          "Brave: o Auto-save precisa da API de arquivos, que vem desligada. Abra brave://flags/#file-system-access-api, " +
+          "mude para Enabled, reinicie o Brave e ative o Auto de novo. Enquanto isso, use Exportar.", 14000
+        );
+        return;
+      }
       if (window.showToast) {
         window.showToast(
           "Auto-save em arquivo único não é suportado neste navegador. Use Chrome/Edge, ou clique em Exportar para salvar manualmente."
