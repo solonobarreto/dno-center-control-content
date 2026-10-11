@@ -2,8 +2,8 @@
 // Assim o screenshot usa o método rápido/4K, com os ícones de classe e sem bloqueio do navegador.
 //
 // Uso (na pasta do projeto):  node cloudflare/scripts/serve.mjs        (porta opcional: node cloudflare/scripts/serve.mjs 3000)
-// A rota /api/dno-events usa cloudflare/functions/api/dno-events.js. As demais Functions (presença, convites) respondem
-// 404 e o site usa os fallbacks locais. Para testar tudo (com D1 local): npx wrangler dev
+// A rota /api/dno-events usa cloudflare/functions/api/dno-events.js. As demais rotas /api/* (presença, convites) não existem mais e respondem
+// 404 e o site usa os fallbacks locais. Para testar o Worker completo: npx wrangler dev
 
 import http from "node:http";
 import { readFile, stat } from "node:fs/promises";
