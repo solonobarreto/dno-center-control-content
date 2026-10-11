@@ -15,3 +15,15 @@ run_worker_first = ["/api/*"]      # só /api/* executa o Worker; o resto é est
 binding = "DB"
 database_name = "dno-center-control"
 database_id = "COLE-O-ID-AQUI"
+
+# Observabilidade (igual ao que o painel da Cloudflare pede para manter em sincronia)
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = false
+head_sampling_rate = 1
+persist = true
