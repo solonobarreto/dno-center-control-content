@@ -1095,22 +1095,22 @@ setInterval(updateEventSublabels, 30000);
 // Patch mais recente lido do dnorigins.com ({ title, url, published }) — usado no cabeçalho
 // da coluna quando ela está no modo Evento.
 // Semente: o tópico do patch de onde vêm os eventos da lista fixa acima. A busca automática
-// (Netlify Function) e o cache substituem isto pelo patch mais recente.
+// (Cloudflare Worker) e o cache substituem isto pelo patch mais recente.
 let EVENT_PATCH = { title: "[Patch] 20-09-2026", url: "https://dnorigins.com/news/patch-20-09-2026/" };
 
 // Busca automática dos eventos: a cada importação de backup (e ao abrir a página) o site consulta
-// a Netlify Function netlify/functions/dno-events.js, que lê o [Patch] mais recente de
+// a Function cloudflare/functions/api/dno-events.js, que lê o [Patch] mais recente de
 // dnorigins.com/news. Sem a função no ar (ex.: abrindo o index.html direto do computador),
 // a busca falha em silêncio e continua valendo a última lista conhecida.
 // Ambiente: o site roda em dois cenários.
-//  • Com servidor (Netlify publicado ou `netlify dev`): as Functions (/api/presence, /api/party-share,
-//    /.netlify/functions/dno-events) existem e tudo funciona (contador real, convites, eventos).
+//  • Com servidor (Cloudflare publicado ou `wrangler dev`): as Functions (/api/presence, /api/party-share,
+//    /api/dno-events) existem e tudo funciona (contador real, convites, eventos).
 //  • Aberto direto do computador (file://): não há Functions; o navegador bloqueia qualquer fetch. Nesse modo o
 //    site nem tenta chamá-las (sem erros no console) e usa os fallbacks locais (contador local, última lista de eventos).
 // Um servidor estático simples (ex.: python -m http.server) responde 404 às Functions; isso é detectado em runtime
 // (apiMissing, no bloco de presença) e as chamadas passam a ser raras.
 const DNO_IS_FILE = location.protocol === "file:";
-const EVENTS_ENDPOINT = "/.netlify/functions/dno-events";
+const EVENTS_ENDPOINT = "/api/dno-events";
 const EVENTS_CACHE_KEY = "dnoEventsCache";
 
 const EVENT_EMPTY_TEXT = {
@@ -2421,7 +2421,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.rebuildEventChips = rebuildEventChips;
 
   let eventsFetching = null;
-  // Consulta o site (via Netlify Function) e atualiza a coluna Event Content.
+  // Consulta o site (via Worker) e atualiza a coluna Event Content.
   // Chamada a cada importação de backup e uma vez ao abrir a página.
   window.refreshEventsFromSite = function () {
     if (eventsFetching) return eventsFetching;
@@ -3166,7 +3166,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         let note = simplified ? i18n("toastNoImages", " (versão sem imagens — abra pelo site publicado para incluir os ícones)") : "";
         if (!simplified && shotMissing > 0) {
-          note = " ⚠ " + shotMissing + " ícone(s) ficaram de fora: o navegador bloqueia imagens locais (file://). Abra pelo site publicado no Netlify.";
+          note = " ⚠ " + shotMissing + " ícone(s) ficaram de fora: o navegador bloqueia imagens locais (file://). Abra pelo site publicado no Cloudflare.";
           console.warn("Screenshot: " + shotMissing + " imagem(ns) local(is) removida(s) do print (file://). Use o site publicado.");
         }
         if (copied) {
@@ -3216,8 +3216,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // -------------------------------------------------------
   // FEATURE 6: Online user counter (real, shared between all visitors)
-  // Each open tab sends a heartbeat to a Netlify Function (/api/presence),
-  // which stores it in Netlify Blobs and answers with how many sessions
+  // Each open tab sends a heartbeat to a Cloudflare Worker (/api/presence),
+  // which stores it in Cloudflare D1 and answers with how many sessions
   // sent a heartbeat recently. If the function is unreachable (e.g. the file
   // is opened locally), it falls back to the old same-browser localStorage count.
   //
@@ -3676,7 +3676,7 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json" },
         // region/country não são mais enviados aqui: o backend agora calcula
         // isso sozinho a partir do IP real da requisição (context.geo da
-        // Netlify), então o que o navegador mandasse seria ignorado mesmo.
+        // Cloudflare), então o que o navegador mandasse seria ignorado mesmo.
         // name/classId = nickname e classe da 1ª linha da tabela (convite do Criador de Grupos).
         body: JSON.stringify({ id: SESSION_ID, ...(getShareProfile() || {}) }),
         cache: "no-store"
@@ -6390,7 +6390,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!live && !users.length) {
       const localMode = typeof window.isLocalMode === "function" && window.isLocalMode();
       onlineListEl.appendChild(note(localMode
-        ? T("apOnlineLocal", "Modo local: os convites só funcionam no site publicado ou com \"netlify dev\".")
+        ? T("apOnlineLocal", "Modo local: os convites só funcionam no site publicado ou com \"wrangler dev\".")
         : T("apOnlineOffline", "Convites indisponíveis: não foi possível falar com o servidor."))); return; }
     if (!users.length) {
       const total = typeof window.getOnlineTotal === "function" ? window.getOnlineTotal() : 0;

@@ -1,0 +1,10 @@
+cloudflare
+wrangler.toml
+package.json
+package-lock.json
+node_modules
+.wrangler
+.git
+.github
+.gitignore
+.assetsignore

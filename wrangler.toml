@@ -1,0 +1,17 @@
+# Cloudflare Workers + assets estáticos (substitui o netlify.toml).
+# O código do servidor fica na pasta cloudflare/ (antes: netlify/functions).
+name = "dno-center-control-content"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-01-01"
+
+[assets]
+directory = "."                    # o site é a raiz do projeto (igual ao publish = "." do Netlify)
+binding = "ASSETS"
+run_worker_first = ["/api/*"]      # só /api/* executa o Worker; o resto é estático
+
+# Banco D1 (substitui o Netlify Blobs). Crie com:  npx wrangler d1 create dno-center-control
+# e cole o database_id que o comando mostrar. A tabela é criada sozinha no primeiro acesso.
+[[d1_databases]]
+binding = "DB"
+database_name = "dno-center-control"
+database_id = "COLE-O-ID-AQUI"

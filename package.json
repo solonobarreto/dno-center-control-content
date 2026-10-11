@@ -2,7 +2,13 @@
   "name": "dno-center-control-content",
   "private": true,
   "version": "1.0.0",
-  "dependencies": {
-    "@netlify/blobs": "^8.1.0"
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "serve": "node cloudflare/scripts/serve.mjs",
+    "icons": "node cloudflare/scripts/build-class-icons.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
   }
 }
