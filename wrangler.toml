@@ -1,6 +1,6 @@
 # Cloudflare Workers + assets estáticos (substitui o netlify.toml).
 # O código do servidor fica na pasta cloudflare/ (antes: netlify/functions).
-name = "dno-center-control-content"
+name = "dnorigins-ccc"
 main = "cloudflare/worker.js"
 compatibility_date = "2026-01-01"
 
