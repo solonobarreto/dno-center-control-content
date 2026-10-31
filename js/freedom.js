@@ -323,6 +323,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const clsName = (c) => (typeof getClassName === "function" ? getClassName(c) : c.name);
   const newId = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
   const cleanGear = (g) => (valid(g) ? { r: g.r, l: Number(g.l) } : null);
+  function cleanDiscord(v) { const s = String(v == null ? "" : v).trim(); return /^\d{5,25}$/.test(s) ? s : ""; }   // só números (ID do Discord)
 
   function h(tag, cls, text) {
     const e = document.createElement(tag);
@@ -436,7 +437,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (r && !Array.isArray(r.classes)) r.classes = [];
     return r;
   }
-  const cleanDiscord = (v) => { const s = String(v == null ? "" : v).trim(); return /^\d{5,25}$/.test(s) ? s : ""; };
 
   // ------------------------------------------------------------ servidor
   async function api(method, body, pass) {
