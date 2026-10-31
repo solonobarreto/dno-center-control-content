@@ -11,6 +11,19 @@
 // Senha: variável de ambiente FREEDOM_PASSWORD (painel/wrangler); se não existir, usa 2846.
 
 const DEFAULT_PASSWORD = "2846";
+
+// ---- Discord: emojis de classe e menções ----
+// Sem nada aqui, o post sai como texto simples (":Saleana:" e "@Loretta"), que o Discord NÃO converte
+// quando vem de webhook. Para o emoji aparecer e a pessoa ser marcada de verdade, preencha:
+//   EMOJI_IDS: classId -> código completo do emoji do servidor, no formato "<:Nome:ID>"
+//              (no Discord, digite \:Saleana: numa mensagem e envie: ele mostra "<:Saleana:123456...>")
+//   USER_IDS:  nick em minúsculas -> ID do usuário no Discord (Modo desenvolvedor > botão direito > Copiar ID)
+const EMOJI_IDS = {
+  // saleana: "<:Saleana:000000000000000000>",
+};
+const USER_IDS = {
+  // loretta: "000000000000000000",
+};
 const RARITIES = ["epic", "unique", "legend"];
 const LEVELS = [80, 90];
 
@@ -155,22 +168,37 @@ export async function onRequest(context) {
     const clean = (v, n) => String(v == null ? "" : v).replace(/[\r\n]+/g, " ").replace(/[\\*_~`|>@]/g, "\\$&").trim().slice(0, n);
     const group = clean(body.group, 40);
     const members = (Array.isArray(body.members) ? body.members : []).slice(0, 8)
-      .map((m) => ({ cls: clean(m && m.cls, 30), nick: clean(m && m.nick, 20) }))
+      .map((m) => ({
+        classId: /^[a-z]{3,24}$/.test(String(m && m.classId)) ? String(m.classId) : "",
+        cls: String((m && m.cls) || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 30),   // emoji: sem espaços (Dark Avenger -> DarkAvenger)
+        nick: clean(m && m.nick, 20),
+        rawNick: String((m && m.nick) || "").trim().toLowerCase()
+      }))
       .filter((m) => m.cls);
     if (!group || !members.length) return json({ error: "bad_group" }, 400);
 
+    const pingIds = [];
     const lines = [
       `**${group}**`,
       `<t:${ts}:d> at <t:${ts}:t> ➜ <t:${ts}:R>`,
       "",
-      ...members.map((m) => (m.nick ? `${m.cls} — ${m.nick}` : m.cls))
+      ...members.map((m) => {
+        const emoji = EMOJI_IDS[m.classId] || `:${m.cls}:`;
+        let who = "";
+        if (m.nick) {
+          const uid = USER_IDS[m.rawNick];
+          if (uid && /^\d{5,25}$/.test(uid)) { who = ` <@${uid}>`; pingIds.push(uid); }
+          else who = ` @${m.nick}`;
+        }
+        return emoji + who;
+      })
     ];
     let res;
     try {
       res = await fetch(hook, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content: lines.join("\n"), allowed_mentions: { parse: [] } })
+        body: JSON.stringify({ content: lines.join("\n"), allowed_mentions: { parse: [], users: pingIds } })
       });
     } catch (_) { return json({ error: "discord_unreachable" }, 502); }
     if (!res.ok) return json({ error: "discord_failed", status: res.status }, 502);

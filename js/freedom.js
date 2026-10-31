@@ -935,7 +935,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Enviar: pergunta o horário → confirma → posta no Discord (via servidor, que guarda o webhook)
   function startSend(g) {
     const members = g.rows.filter((r) => r.classId && classById(r.classId))
-      .map((r) => ({ cls: clsName(classById(r.classId)), nick: r.nick || "" }));
+      .map((r) => ({ classId: r.classId, cls: classById(r.classId).name, nick: r.nick || "" }));
     // Sempre abre o seletor de data/hora; as checagens vêm depois de confirmar.
     openTimePicker(async (ts) => {
       if (!members.length) return toast(t("sendEmpty"));
