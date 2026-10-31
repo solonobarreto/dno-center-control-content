@@ -4607,6 +4607,13 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
 /* gaveta DATABASE */
 .fd-drawer { background: var(--bg-panel); border: 1px solid var(--border-ember); border-radius: 7px; padding: 10px; }
 .fd-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.fd-side-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px; }
+.fd-side-head .fd-side-title { margin: 0 0 0 2px; }
+.fd-plus-sm { width: 26px; height: 26px; font-size: 16px; }
+.fd-person-form { margin-bottom: 10px; }
+.fd-label-gap { margin-top: 8px; }
+.fd-drawer + .fd-drawer, .fd-person-form + .fd-drawer, .fd-drawer + .fd-person-form { margin-top: 8px; }
+.fd-person-x { padding: 2px 4px; }
 .fd-side-title {
   margin: 0 0 8px 2px; font-size: 11px; letter-spacing: 1.5px; color: var(--text-faint); font-weight: 700;
 }

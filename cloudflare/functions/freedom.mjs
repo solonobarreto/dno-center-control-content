@@ -6,23 +6,49 @@
 // Rota: /api/freedom   (todas as chamadas exigem o cabeçalho x-freedom-key com a senha)
 //   GET  -> { players: [...] }
 //   PUT  -> body { player, oldNick? } (cria/atualiza; se oldNick vier e for diferente, renomeia)
+//   DELETE -> body { nick } (remove a pessoa do database)
 //   POST -> body { action: "discord", ts, group, members: [{cls, nick}] } (posta a escalação no Discord; precisa de DISCORD_WEBHOOK_URL)
 //
 // Senha: variável de ambiente FREEDOM_PASSWORD (painel/wrangler); se não existir, usa 2846.
 
 const DEFAULT_PASSWORD = "2846";
 
-// ---- Discord: emojis de classe e menções ----
-// Sem nada aqui, o post sai como texto simples (":Saleana:" e "@Loretta"), que o Discord NÃO converte
-// quando vem de webhook. Para o emoji aparecer e a pessoa ser marcada de verdade, preencha:
-//   EMOJI_IDS: classId -> código completo do emoji do servidor, no formato "<:Nome:ID>"
-//              (no Discord, digite \:Saleana: numa mensagem e envie: ele mostra "<:Saleana:123456...>")
-//   USER_IDS:  nick em minúsculas -> ID do usuário no Discord (Modo desenvolvedor > botão direito > Copiar ID)
+// ---- Discord: emojis de classe ----
+// O ID do Discord de cada pessoa agora é cadastrado no próprio database (campo ao lado do nick) e vem no post.
+// Aqui ficam só os emojis das classes (classId -> "<:Nome:ID>"). Sem emoji cadastrado, sai ":NomeDaClasse:" em texto.
 const EMOJI_IDS = {
-  // saleana: "<:Saleana:000000000000000000>",
-};
-const USER_IDS = {
-  // loretta: "000000000000000000",
+  barbarian: "<:Barbarian:1424609685360738314>",
+  destroyer: "<:Destroyer:1424611079950172264>",
+  gladiator: "<:Gladiator:1424611093959020564>",
+  moonlord: "<:Moonlord:1424611100842004490>",
+  darkavenger: "<:DarkAvenger:1424610973993537536>",
+  tempest: "<:Tempest:1424612183739863071>",
+  sentinel: "<:Sentinel:1424611128054513684>",
+  sniper: "<:Sniper:1424611130483015830>",
+  obscuria: "<:Obscuria:1424611102918049832>",
+  ilumia: "<:Ilumia:1424611096463015946>",
+  glaciana: "<:Glaciana:1424611092549865573>",
+  saleana: "<:Saleana:1442563843128688650>",
+  shootingstar: "<:ShootingStar:1424611120487993384>",
+  gearmaster: "<:GearMaster:1424611091299696783>",
+  adept: "<:Adept:1424609767032361010>",
+  physician: "<:Physician:1424611106936193065>",
+  crusader: "<:Crusader:1424609650065674291>",
+  guardian: "<:Guardian:1424611095200530494>",
+  inquisitor: "<:Inquisitor:1424611097641619468>",
+  saint: "<:Saint:1424611122828415057>",
+  spiritdancer: "<:SpiritDancer:1424612618835857418>",
+  bladedancer: "<:BladeDancer:1424609718399271034>",
+  souleater: "<:SoulEater:1424611117770215524>",
+  darksummoner: "<:DarkSummoner:1424611077764943973>",
+  abysswalker: "<:AbyssWalker:1424609580335501352>",
+  raven: "<:Raven:1424611109184213072>",
+  ripper: "<:Ripper:1424612022783447110>",
+  valkyrie: "<:Valkyrie:1424611134744301588>",
+  flurry: "<:Flurry:1424611082877669397>",
+  ruina: "<:Ruina:1424611113022132285>",
+  defensio: "<:Defensio:1424612387931291689>",
+  // faltam (emoji não encontrado no servidor): silverhunter, windwalker, lightfury
 };
 const RARITIES = ["epic", "unique", "legend"];
 const LEVELS = [80, 90];
@@ -108,7 +134,8 @@ function cleanPlayer(p) {
     classes.push({ id, classId, set, weapon });
     if (classes.length >= MAX_ENTRIES) break;
   }
-  return { nick, classes, updated: Date.now() };
+  const discord = /^\d{5,25}$/.test(String(p.discord || "").trim()) ? String(p.discord).trim() : "";
+  return { nick, discord, classes, updated: Date.now() };
 }
 
 const pkey = (nick) => "p:" + String(nick).trim().toLowerCase();
@@ -170,9 +197,9 @@ export async function onRequest(context) {
     const members = (Array.isArray(body.members) ? body.members : []).slice(0, 8)
       .map((m) => ({
         classId: /^[a-z]{3,24}$/.test(String(m && m.classId)) ? String(m.classId) : "",
+        discord: /^\d{5,25}$/.test(String((m && m.discord) || "").trim()) ? String(m.discord).trim() : "",
         cls: String((m && m.cls) || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 30),   // emoji: sem espaços (Dark Avenger -> DarkAvenger)
-        nick: clean(m && m.nick, 20),
-        rawNick: String((m && m.nick) || "").trim().toLowerCase()
+        nick: clean(m && m.nick, 20)
       }))
       .filter((m) => m.cls);
     if (!group || !members.length) return json({ error: "bad_group" }, 400);
@@ -185,11 +212,8 @@ export async function onRequest(context) {
       ...members.map((m) => {
         const emoji = EMOJI_IDS[m.classId] || `:${m.cls}:`;
         let who = "";
-        if (m.nick) {
-          const uid = USER_IDS[m.rawNick];
-          if (uid && /^\d{5,25}$/.test(uid)) { who = ` <@${uid}>`; pingIds.push(uid); }
-          else who = ` @${m.nick}`;
-        }
+        if (m.discord) { who = ` <@${m.discord}>`; pingIds.push(m.discord); }   // marca de verdade (ID cadastrado)
+        else if (m.nick) who = ` @${m.nick}`;                                     // sem ID: só texto, sem notificação
         return emoji + who;
       })
     ];
@@ -202,6 +226,17 @@ export async function onRequest(context) {
       });
     } catch (_) { return json({ error: "discord_unreachable" }, 502); }
     if (!res.ok) return json({ error: "discord_failed", status: res.status }, 502);
+    return json({ ok: true });
+  }
+
+  // Remove uma pessoa do database da comunidade.
+  if (request.method === "DELETE") {
+    const text = await request.text();
+    let body;
+    try { body = JSON.parse(text); } catch (_) { return json({ error: "bad_json" }, 400); }
+    const nick = String((body && body.nick) || "").trim();
+    if (!nick || nick.length > 20) return json({ error: "bad_nick" }, 400);
+    await store.delete(pkey(nick));
     return json({ ok: true });
   }
 

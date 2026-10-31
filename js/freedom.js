@@ -45,6 +45,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // ------------------------------------------------------------ idiomas
   const FD = {
     "pt-BR": {
+      discordLabel: "ID do Discord (opcional)", discordPh: "ID do Discord", addPerson: "Adicionar pessoa", addClass: "Adicionar classe", delPerson: "Remover pessoa",
+      confirmDelPerson: "Remover {p} e todas as classes dela do database?", discordBad: "O ID do Discord deve ter só números.", emptyList2: "Nenhuma classe salva ainda. Clique em + para adicionar.",
       timeTitle: "Horário do evento", timeZone: "Fuso", timeConfirm: "Confirmar", sentOk: "{g} enviado ao Discord.", sendFail: "Não foi possível enviar ao Discord.",
       sendNoHook: "O webhook do Discord ainda não foi configurado no servidor.", sendNeedOnline: "Entre na área com a senha (modo sincronizado) para enviar ao Discord.", sendEmpty: "Preencha ao menos um slot do grupo antes de enviar.",
       comm: "Comunidade", groups: "Grupos", newGroup: "Novo grupo",
@@ -70,6 +72,8 @@ document.addEventListener("DOMContentLoaded", () => {
       slotsQ: "Quantos slots?", viewComp: "Ver buffs e debuffs", viewTable: "Ver tabela"
     },
     "pt-PT": {
+      discordLabel: "ID do Discord (opcional)", discordPh: "ID do Discord", addPerson: "Adicionar pessoa", addClass: "Adicionar classe", delPerson: "Remover pessoa",
+      confirmDelPerson: "Remover {p} e todas as classes dela da base de dados?", discordBad: "O ID do Discord deve ter apenas números.", emptyList2: "Ainda não há classes guardadas. Clique em + para adicionar.",
       timeTitle: "Horário do evento", timeZone: "Fuso", timeConfirm: "Confirmar", sentOk: "{g} enviado para o Discord.", sendFail: "Não foi possível enviar para o Discord.",
       sendNoHook: "O webhook do Discord ainda não foi configurado no servidor.", sendNeedOnline: "Entre na área com a palavra-passe (modo sincronizado) para enviar para o Discord.", sendEmpty: "Preencha pelo menos uma vaga do grupo antes de enviar.",
       comm: "Comunidade", groups: "Grupos", newGroup: "Novo grupo",
@@ -95,6 +99,8 @@ document.addEventListener("DOMContentLoaded", () => {
       slotsQ: "Quantas vagas?", viewComp: "Ver buffs e debuffs", viewTable: "Ver tabela"
     },
     es: {
+      discordLabel: "ID de Discord (opcional)", discordPh: "ID de Discord", addPerson: "Añadir persona", addClass: "Añadir clase", delPerson: "Quitar persona",
+      confirmDelPerson: "¿Quitar a {p} y todas sus clases de la base de datos?", discordBad: "El ID de Discord debe tener solo números.", emptyList2: "Aún no hay clases guardadas. Haz clic en + para añadir.",
       timeTitle: "Hora del evento", timeZone: "Zona", timeConfirm: "Confirmar", sentOk: "{g} enviado a Discord.", sendFail: "No se pudo enviar a Discord.",
       sendNoHook: "El webhook de Discord aún no está configurado en el servidor.", sendNeedOnline: "Entra con la contraseña (modo sincronizado) para enviar a Discord.", sendEmpty: "Rellena al menos un slot del grupo antes de enviar.",
       comm: "Comunidad", groups: "Grupos", newGroup: "Nuevo grupo",
@@ -120,6 +126,8 @@ document.addEventListener("DOMContentLoaded", () => {
       slotsQ: "¿Cuántos espacios?", viewComp: "Ver buffs y debuffs", viewTable: "Ver tabla"
     },
     en: {
+      discordLabel: "Discord ID (optional)", discordPh: "Discord ID", addPerson: "Add person", addClass: "Add class", delPerson: "Remove person",
+      confirmDelPerson: "Remove {p} and all their classes from the database?", discordBad: "The Discord ID must be numbers only.", emptyList2: "No class saved yet. Click + to add one.",
       timeTitle: "Event time", timeZone: "Zone", timeConfirm: "Confirm", sentOk: "{g} sent to Discord.", sendFail: "Could not send to Discord.",
       sendNoHook: "The Discord webhook isn’t configured on the server yet.", sendNeedOnline: "Sign in with the password (synced mode) to send to Discord.", sendEmpty: "Fill at least one slot in the group before sending.",
       comm: "Community", groups: "Groups", newGroup: "New group",
@@ -389,7 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return out;
   }
   function normPlayer(p) {
-    return { nick: p.nick, classes: normList(p.classes), updated: p.updated || 0 };
+    return { nick: p.nick, discord: cleanDiscord(p.discord), classes: normList(p.classes), updated: p.updated || 0, pending: !!p.pending };
   }
 
   // ------------------------------------------------------------ estado
@@ -410,9 +418,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const groupOpen = new Set();  // grupos expandidos (gaveta); começam guardados
   const compOpen = new Set();   // grupos que estão na visão "buffs/debuffs" (só na memória)
 
-  let view = "list";         // "list" | "classes" | "gear"
-  let editingNick = false;
-  let drawerOpen = false;    // gaveta do nick: fechada até clicar
+  let editor = null;         // { key, stage: "classes" | "gear" }: gaveta que está escolhendo classe / editando equipamento
+  let personForm = null;     // null | { mode: "first" | "add" | "edit", key? }: formulário de nick + ID do Discord
+  const openDrawers = new Set();  // gavetas (pessoas) abertas; começam guardadas
   let pickClass = "";
   let editId = null;         // id do item que está sendo editado (null = novo)
   let draft = { set: null, weapon: null };
@@ -423,12 +431,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const saveGroups = () => store.set(GROUPS_KEY, groups);
   const persistDB = () => store.set(DB_KEY, db);
-  function mineRec() {
-    const k = key(me);
-    if (!db[k]) db[k] = { nick: me, classes: [], updated: Date.now() };
-    if (!Array.isArray(db[k].classes)) db[k].classes = [];
-    return db[k];
+  function recOf(k) {
+    const r = db[k];
+    if (r && !Array.isArray(r.classes)) r.classes = [];
+    return r;
   }
+  const cleanDiscord = (v) => { const s = String(v == null ? "" : v).trim(); return /^\d{5,25}$/.test(s) ? s : ""; };
 
   // ------------------------------------------------------------ servidor
   async function api(method, body, pass) {
@@ -456,12 +464,16 @@ document.addEventListener("DOMContentLoaded", () => {
     statusEl.className = "fd-status " + syncState;
   }
 
-  async function pushMine(oldNick) {
-    persistDB();
-    if (!sessionKey || !me) return;
-    const r = await api("PUT", { player: mineRec(), oldNick: oldNick || undefined }, sessionKey);
+  // Envia o cadastro de UMA pessoa ao servidor (mantém "pending" enquanto não sincronizar)
+  async function pushPlayer(k, oldNick) {
+    const rec = db[k];
+    if (!rec) return;
+    if (!sessionKey) { rec.pending = true; persistDB(); return; }
+    rec.pending = true; persistDB();
+    const r = await api("PUT", { player: rec, oldNick: oldNick || undefined }, sessionKey);
     if (r.status === 200) {
       syncState = "online";
+      if (db[k]) { delete db[k].pending; persistDB(); }
     } else if (r.status === 409) {
       toast(t("nickDupComm"));
     } else {
@@ -469,163 +481,241 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     setStatus();
   }
+  const pushMine = (oldNick) => (me ? pushPlayer(key(me), oldNick) : undefined);
 
+  // Junta o que veio do servidor com o que está só aqui (alterações feitas offline e ainda não enviadas vencem)
   function mergeRemote(players) {
-    const mine = db[key(me)];
     const next = {};
     players.forEach((p) => { if (p && p.nick) next[key(p.nick)] = normPlayer(p); });
-    if (mine) {
-      const remote = next[key(me)];
-      if (!remote || (mine.updated || 0) > (remote.updated || 0)) {
-        next[key(me)] = mine; // alterações feitas offline vencem
-        db = next; persistDB(); pushMine();
-        return;
+    const toPush = [];
+    Object.keys(db).forEach((k) => {
+      const local = db[k];
+      if (!local) return;
+      const remote = next[k];
+      const mine = k === key(me);
+      if ((local.pending || mine) && (!remote || (local.updated || 0) > (remote.updated || 0))) {
+        next[k] = local; toPush.push(k);
       }
-    }
+    });
     db = next;
     persistDB();
+    toPush.forEach((k) => pushPlayer(k));
   }
 
-  // ------------------------------------------------------------ nickname
-  function confirmNick(raw) {
-    const v = String(raw).trim().replace(/\s+/g, " ");
+  // ------------------------------------------------------------ pessoas (nick + ID do Discord)
+  // mode: "first" (meu primeiro nick) | "add" (outra pessoa) | "edit" (editar nick/ID de k0)
+  function savePerson(mode, k0, rawNick, rawDiscord) {
+    const v = String(rawNick).trim().replace(/\s+/g, " ");
     if (!v) return t("nickEmpty");
     if (v.length > 20) return t("nickMax");
-    const old = me;
-    const renamed = !!old && key(old) !== key(v);
-    if (renamed) {
-      if (db[key(v)]) return t("nickDup");
-      const rec = db[key(old)] || { nick: v, classes: [] };
-      delete db[key(old)];
-      rec.nick = v;
-      rec.updated = Date.now();
+    const dRaw = String(rawDiscord || "").trim();
+    if (dRaw && !cleanDiscord(dRaw)) return t("discordBad");
+    const discord = cleanDiscord(dRaw);
+
+    if (mode === "edit") {
+      const rec = db[k0];
+      if (!rec) { personForm = null; renderSide(); return null; }
+      const old = rec.nick;
+      const renamed = key(old) !== key(v);
+      if (renamed && db[key(v)]) return t("nickDup");
+      if (renamed) {
+        delete db[k0];
+        groups.forEach((g) => g.rows.forEach((r) => { if (key(r.nick) === key(old)) r.nick = v; }));
+        saveGroups();
+        if (openDrawers.delete(k0)) openDrawers.add(key(v));
+        if (editor && editor.key === k0) editor.key = key(v);
+        if (key(me) === k0) { me = v; try { localStorage.setItem(NICK_KEY, me); } catch (_) {} }
+      }
+      rec.nick = v; rec.discord = discord; rec.updated = Date.now();
       db[key(v)] = rec;
-      groups.forEach((g) => g.rows.forEach((r) => { if (key(r.nick) === key(old)) r.nick = v; }));
-      saveGroups();
-    } else if (db[key(v)]) {
-      db[key(v)].nick = v;                 // já existe: assume o cadastro (ex.: outro aparelho)
-    } else {
-      db[key(v)] = { nick: v, classes: [], updated: Date.now() };
+      personForm = null;
+      pushPlayer(key(v), renamed ? old : undefined);
+      renderAll();
+      return null;
     }
-    me = v;
-    try { localStorage.setItem(NICK_KEY, me); } catch (_) {}
-    editingNick = false;
-    view = "list";
-    pushMine(renamed ? old : undefined);
+
+    if (mode === "add" && db[key(v)]) return t("nickDup");
+    if (db[key(v)]) {                       // já existe (ex.: veio da comunidade / outro aparelho): assume o cadastro
+      db[key(v)].nick = v;
+      if (discord) db[key(v)].discord = discord;
+      db[key(v)].updated = Date.now();
+    } else {
+      db[key(v)] = { nick: v, discord, classes: [], updated: Date.now() };
+    }
+    if (mode === "first") {
+      me = v;
+      try { localStorage.setItem(NICK_KEY, me); } catch (_) {}
+    } else {
+      openDrawers.add(key(v));
+    }
+    personForm = null;
+    pushPlayer(key(v));
     renderAll();
     return null;
   }
 
-  // ------------------------------------------------------------ lateral esquerda
-  function renderSide() {
-    side.innerHTML = "";
-    side.appendChild(h("div", "fd-side-title", "DATABASE"));
-    if (!me || editingNick) renderNickForm(); else renderDrawer();
+  async function removePerson(k) {
+    const rec = db[k];
+    if (!rec || k === key(me)) return;
+    if (!window.confirm(t("confirmDelPerson", { p: rec.nick }))) return;
+    delete db[k];
+    openDrawers.delete(k);
+    if (editor && editor.key === k) editor = null;
+    persistDB();
+    renderSide();
+    if (sessionKey) await api("DELETE", { nick: rec.nick }, sessionKey);
   }
 
-  function renderNickForm() {
-    const box = h("div", "fd-nick-form");
+  // ------------------------------------------------------------ lateral esquerda
+  // DATABASE [+]  →  uma gaveta por pessoa (nick + ID do Discord); dentro, as classes dela e o botão + para adicionar classes.
+  function renderSide() {
+    side.innerHTML = "";
+    const head = h("div", "fd-side-head");
+    head.appendChild(h("div", "fd-side-title", "DATABASE"));
+    if (me) {
+      const plus = h("button", "fd-plus fd-plus-sm", "+");
+      plus.type = "button"; plus.title = t("addPerson"); plus.setAttribute("aria-label", t("addPerson"));
+      plus.onclick = () => { personForm = { mode: "add" }; renderSide(); };
+      head.appendChild(plus);
+    }
+    side.appendChild(head);
+
+    const form = personForm || (!me ? { mode: "first" } : null);
+    if (form && form.mode !== "edit") renderPersonForm(form);
+
+    const mk = key(me);
+    Object.keys(db)
+      .sort((a, b) => (a === mk ? -1 : b === mk ? 1 : String(db[a].nick).localeCompare(String(db[b].nick))))
+      .forEach((k) => {
+        if (form && form.mode === "edit" && form.key === k) renderPersonForm(form);
+        else renderDrawer(k);
+      });
+  }
+
+  function renderPersonForm(form) {
+    const rec = form.mode === "edit" ? db[form.key] : null;
+    const box = h("div", "fd-nick-form fd-person-form");
     box.appendChild(h("label", "fd-label", t("nickLabel")));
-    const row = h("div", "fd-nick-row");
     const input = h("input", "fd-input");
     input.type = "text"; input.maxLength = 20; input.placeholder = t("nickPh");
-    input.value = me || ""; input.autocomplete = "off"; input.spellcheck = false;
+    input.value = rec ? rec.nick : ""; input.autocomplete = "off"; input.spellcheck = false;
+    box.appendChild(input);
+
+    box.appendChild(h("label", "fd-label fd-label-gap", t("discordLabel")));
+    const row = h("div", "fd-nick-row");
+    const did = h("input", "fd-input");
+    did.type = "text"; did.inputMode = "numeric"; did.maxLength = 25; did.placeholder = t("discordPh");
+    did.value = rec ? rec.discord || "" : ""; did.autocomplete = "off"; did.spellcheck = false;
+    did.oninput = () => { did.value = did.value.replace(/\D/g, ""); };
     const ok = h("button", "fd-mini fd-ok", "✓");
     ok.type = "button"; ok.title = t("confirm"); ok.setAttribute("aria-label", t("confirm"));
-    row.append(input, ok);
-    if (me) {
+    row.append(did, ok);
+    if (me || form.mode !== "first") {
       const cancel = h("button", "fd-mini", "✕");
       cancel.type = "button"; cancel.title = t("cancel"); cancel.setAttribute("aria-label", t("cancel"));
-      cancel.onclick = () => { editingNick = false; renderSide(); };
+      cancel.onclick = () => { personForm = null; renderSide(); };
       row.appendChild(cancel);
     }
     const err = h("div", "fd-error");
     box.append(row, err);
     side.appendChild(box);
-    const submit = () => { const msg = confirmNick(input.value); if (msg) err.textContent = msg; };
+    const submit = () => { const msg = savePerson(form.mode, form.key, input.value, did.value); if (msg) err.textContent = msg; };
     ok.onclick = submit;
-    input.onkeydown = (e) => { if (e.key === "Enter") submit(); };
+    input.onkeydown = did.onkeydown = (e) => { if (e.key === "Enter") submit(); };
     setTimeout(() => input.focus(), 0);
   }
 
-  function renderDrawer() {
-    const dr = h("div", "fd-drawer" + (drawerOpen ? " open" : ""));
+  function renderDrawer(k) {
+    const rec = db[k];
+    if (!rec) return;
+    const open = openDrawers.has(k);
+    const dr = h("div", "fd-drawer" + (open ? " open" : ""));
     const head = h("div", "fd-drawer-head");
 
     // Nick = gaveta: clicou, expande; clicou de novo, guarda
     const nickBtn = h("button", "fd-drawer-nick");
     nickBtn.type = "button";
-    nickBtn.setAttribute("aria-expanded", drawerOpen ? "true" : "false");
-    nickBtn.append(h("span", "fd-caret", drawerOpen ? "▾" : "▸"), h("span", "fd-drawer-nick-text", me));
-    nickBtn.onclick = () => { drawerOpen = !drawerOpen; renderSide(); };
+    nickBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    nickBtn.append(h("span", "fd-caret", open ? "▾" : "▸"), h("span", "fd-drawer-nick-text", rec.nick));
+    nickBtn.onclick = () => {
+      if (open) { openDrawers.delete(k); if (editor && editor.key === k) editor = null; }
+      else openDrawers.add(k);
+      renderSide();
+    };
 
-    // Editar nick: só o ícone, ao lado do menu
+    // Editar nick / ID do Discord
     const edit = iconBtn("fd-mini fd-icon-btn fd-edit", "edit", t("editNick"));
-    edit.onclick = () => { editingNick = true; renderSide(); };
+    edit.onclick = () => { personForm = { mode: "edit", key: k }; renderSide(); };
 
-    const wrap = h("div", "fd-menu-wrap");
-    const burger = h("button", "fd-mini fd-burger");
-    burger.type = "button"; burger.title = t("menu"); burger.setAttribute("aria-label", t("menu"));
-    burger.innerHTML = "<span></span><span></span><span></span>";
-    const menu = h("div", "fd-menu hidden");
-    [["mClass", "classes"], ["mList", "list"]].forEach(([labelKey, v]) => {
-      const it = h("button", "fd-menu-item", t(labelKey));
-      it.type = "button";
-      it.onclick = (e) => { e.stopPropagation(); view = v; drawerOpen = true; renderSide(); };
-      menu.appendChild(it);
-    });
-    burger.onclick = (e) => { e.stopPropagation(); menu.classList.toggle("hidden"); };
-    wrap.append(burger, menu);
-    head.append(nickBtn, edit, wrap);
+    // + adiciona classes na gaveta
+    const add = h("button", "fd-mini fd-icon-btn fd-add-class", "+");
+    add.type = "button"; add.title = t("addClass"); add.setAttribute("aria-label", t("addClass"));
+    add.onclick = () => { openDrawers.add(k); editor = { key: k, stage: "classes" }; renderSide(); };
+
+    head.append(nickBtn, edit, add);
+    if (k !== key(me)) {
+      const del = h("button", "btn-close-guide fd-person-x", "✕");
+      del.type = "button"; del.title = t("delPerson"); del.setAttribute("aria-label", t("delPerson"));
+      del.onclick = () => removePerson(k);
+      head.appendChild(del);
+    }
     dr.appendChild(head);
 
-    if (drawerOpen) {
+    if (open) {
       const body = h("div", "fd-drawer-body");
-      if (view === "classes") buildClasses(body);
-      else if (view === "gear") buildGear(body);
-      else buildList(body);
+      if (editor && editor.key === k) {
+        if (editor.stage === "gear") buildGear(body, k);
+        else buildClasses(body, k);
+      } else buildList(body, k);
       dr.appendChild(body);
     }
     side.appendChild(dr);
   }
 
-  function startEdit(entry, classId) {
+  function startEdit(entry, classId, k) {
     pickClass = classId;
     editId = entry ? entry.id : null;
     draft = { set: entry ? cleanGear(entry.set) : null, weapon: entry ? cleanGear(entry.weapon) : null };
     tab = "set";
-    view = "gear";
+    openDrawers.add(k);
+    editor = { key: k, stage: "gear" };
     renderSide();
   }
 
   // Menu Classe → grade com todas as classes (clicar SEMPRE cria um item novo: pode repetir classe)
-  function buildClasses(body) {
+  function buildClasses(body, k) {
+    const topRow = h("div", "fd-gear-top");
+    const back = h("button", "fd-mini fd-icon-btn", "‹");
+    back.type = "button"; back.title = t("cancel"); back.setAttribute("aria-label", t("cancel"));
+    back.onclick = () => { editor = null; renderSide(); };
+    topRow.appendChild(back);
+    body.appendChild(topRow);
     body.appendChild(h("div", "fd-sub", t("pickClass")));
     const grid = h("div", "fd-class-grid");
-    const mine = mineRec().classes;
+    const mine = recOf(k).classes;
     ALL_CLASSES.forEach((c) => {
       const n = mine.filter((e) => e.classId === c.id).length;
       const b = h("button", "fd-class-btn" + (n ? " has" : ""));
       b.type = "button"; b.title = clsName(c);
       b.appendChild(icon(c.id));
       if (n > 1) b.appendChild(h("b", "fd-count", String(n)));
-      b.onclick = () => startEdit(null, c.id);
+      b.onclick = () => startEdit(null, c.id, k);
       grid.appendChild(b);
     });
     body.appendChild(grid);
   }
 
   // Equipamento → abas Set / Weapon (estilo abas do navegador)
-  function buildGear(body) {
+  function buildGear(body, k) {
     const c = classById(pickClass);
-    if (!c) { view = "classes"; return buildClasses(body); }
+    if (!c) { editor.stage = "classes"; return buildClasses(body, k); }
 
     // Topo: "‹" para voltar à esquerda e a classe alinhada à direita.
     // Logo abaixo, à direita, o ✕ de limpar a aba atual (mesmo visual do ✕ de fechar janela).
     const top = h("div", "fd-gear-top");
     const back = h("button", "fd-mini fd-icon-btn", "‹");
     back.type = "button"; back.title = t("classes"); back.setAttribute("aria-label", t("classes"));
-    back.onclick = () => { view = "classes"; renderSide(); };
+    back.onclick = () => { editor.stage = "classes"; renderSide(); };
     const title = h("div", "fd-gear-title");
     title.append(icon(c.id), h("span", null, clsName(c)));
     top.append(back, title);
@@ -690,7 +780,7 @@ document.addEventListener("DOMContentLoaded", () => {
     save.onclick = () => {
       const entry = { set: cleanGear(draft.set), weapon: cleanGear(draft.weapon) };
       const has = !!(entry.set || entry.weapon);
-      const rec = mineRec();
+      const rec = recOf(k);
       if (editId) {
         const i = rec.classes.findIndex((e) => e.id === editId);
         if (i >= 0) { if (has) Object.assign(rec.classes[i], entry); else rec.classes.splice(i, 1); }
@@ -699,8 +789,8 @@ document.addEventListener("DOMContentLoaded", () => {
         rec.classes.push(Object.assign({ id: newId(), classId: pickClass }, entry));
       }
       rec.updated = Date.now();
-      pushMine();
-      view = "list";
+      pushPlayer(k);
+      editor = null;
       renderAll();
       if (has) toast(t("saved", { c: clsName(c) }));
       else if (editId) toast(t("removed", { c: clsName(c) }));
@@ -710,14 +800,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Menu Lista → um cartão por item salvo (a mesma classe pode aparecer várias vezes):
   // ícone à esquerda e as bolinhas (S80 / W80) uma abaixo da outra, à direita. ✕ sempre visível para excluir.
-  function buildList(body) {
-    const mine = mineRec().classes;
+  function buildList(body, k) {
+    const mine = recOf(k).classes;
     const items = mine
       .filter((e) => classById(e.classId))
       .slice()
       .sort((a, b) => ALL_CLASSES.findIndex((c) => c.id === a.classId) - ALL_CLASSES.findIndex((c) => c.id === b.classId));
     if (!items.length) {
-      body.appendChild(h("div", "fd-empty-small", t("emptyList")));
+      body.appendChild(h("div", "fd-empty-small", t("emptyList2")));
       return;
     }
     const grid = h("div", "fd-list-grid");
@@ -731,14 +821,14 @@ document.addEventListener("DOMContentLoaded", () => {
       rm.type = "button"; rm.title = t("delClass"); rm.setAttribute("aria-label", t("delClass"));
       rm.onclick = (ev) => {
         ev.stopPropagation();
-        const rec = mineRec();
+        const rec = recOf(k);
         rec.classes = rec.classes.filter((x) => x.id !== e.id);
         rec.updated = Date.now();
-        pushMine();
+        pushPlayer(k);
         renderAll();
       };
       tile.appendChild(rm);
-      tile.onclick = () => startEdit(e, e.classId);
+      tile.onclick = () => startEdit(e, e.classId, k);
       grid.appendChild(tile);
     });
     body.appendChild(grid);
@@ -760,9 +850,6 @@ document.addEventListener("DOMContentLoaded", () => {
     pop.style.top = top + "px";
   }
   document.addEventListener("mousedown", (e) => { if (pop && !pop.contains(e.target)) closePop(); });
-  document.addEventListener("click", () => {
-    side.querySelectorAll(".fd-menu").forEach((m) => m.classList.add("hidden"));
-  });
   groupsBox.addEventListener("scroll", closePop);
 
   // ------------------------------------------------------------ horário + envio ao Discord
@@ -935,7 +1022,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Enviar: pergunta o horário → confirma → posta no Discord (via servidor, que guarda o webhook)
   function startSend(g) {
     const members = g.rows.filter((r) => r.classId && classById(r.classId))
-      .map((r) => ({ classId: r.classId, cls: classById(r.classId).name, nick: r.nick || "" }));
+      .map((r) => ({ classId: r.classId, cls: classById(r.classId).name, nick: r.nick || "", discord: (db[key(r.nick)] && db[key(r.nick)].discord) || "" }));
     // Sempre abre o seletor de data/hora; as checagens vêm depois de confirmar.
     openTimePicker(async (ts) => {
       if (!members.length) return toast(t("sendEmpty"));
@@ -1261,9 +1348,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function openFreedom() {
     restart(modal);
     overlay.classList.remove("hidden");
-    editingNick = false;
-    drawerOpen = false;
-    view = "list";
+    editor = null;
+    personForm = null;
+    openDrawers.clear();
     renderAll();
   }
   function closeFreedom() {
