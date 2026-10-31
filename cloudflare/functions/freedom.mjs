@@ -222,17 +222,16 @@ export async function onRequest(context) {
     const lines = [
       `<t:${ts}:d> at <t:${ts}:t> ➜ <t:${ts}:R>`,
       mono(group),
-      "",
+      "   -",
       ...members.map((m) => {
         const emoji = EMOJI_IDS[m.classId] || `:${EMOJI_NAMES[m.classId] || m.cls}:`;
         let who = "";
         if (m.discord) { who = ` <@${m.discord}>`; pingIds.push(m.discord); }   // marca de verdade (ID cadastrado)
         else if (m.nick) who = ` @${m.nick}`;                                     // sem ID: só texto, sem notificação
         // item lendário: classe + 3 espaços + triângulo vermelho + nick
-        return m.legend ? `${emoji}   :small_red_triangle:${who}` : emoji + who;
+        return " " + (m.legend ? `${emoji}   :small_red_triangle:${who}` : emoji + who);   // 1 espaço antes da classe
       }),
-      "",
-      "-"
+      "   -"
     ];
     let res;
     try {
