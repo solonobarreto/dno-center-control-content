@@ -4941,3 +4941,4 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
 .fd-pop-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
 .fd-pop-head .fd-sub { flex: 1; min-width: 0; }
 .fd-pop-x { padding: 2px 4px; flex: none; }
+.fd-pop-head-end { justify-content: flex-end; margin-bottom: 4px; }

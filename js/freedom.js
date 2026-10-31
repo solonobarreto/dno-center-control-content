@@ -1287,6 +1287,15 @@ document.addEventListener("DOMContentLoaded", () => {
   function openClassPop(anchor, g, i) {
     openPop(anchor, (p) => {
       p.classList.add("fd-pop-classes");
+      // X padrão no canto superior direito: limpa a linha (classe + nick)
+      if (g.rows[i].classId) {
+        const head = h("div", "fd-pop-head fd-pop-head-end");
+        const x = h("button", "btn-close-guide fd-pop-x", "✕");
+        x.type = "button"; x.title = t("clearRow"); x.setAttribute("aria-label", t("clearRow"));
+        x.onclick = () => { g.rows[i] = { classId: "", nick: "", eid: "" }; saveGroups(); closePop(); renderGroups(); };
+        head.appendChild(x);
+        p.appendChild(head);
+      }
       const grid = h("div", "fd-class-grid");
       ALL_CLASSES.forEach((c) => {
         const b = h("button", "fd-class-btn" + (g.rows[i].classId === c.id ? " has" : ""));
@@ -1299,12 +1308,6 @@ document.addEventListener("DOMContentLoaded", () => {
         grid.appendChild(b);
       });
       p.appendChild(grid);
-      if (g.rows[i].classId) {
-        const clr = h("button", "fd-link", t("clearRow"));
-        clr.type = "button";
-        clr.onclick = () => { g.rows[i] = { classId: "", nick: "", eid: "" }; saveGroups(); closePop(); renderGroups(); };
-        p.appendChild(clr);
-      }
     });
   }
 

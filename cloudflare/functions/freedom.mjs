@@ -208,18 +208,28 @@ export async function onRequest(context) {
     if (!group || !members.length) return json({ error: "bad_group" }, 400);
 
     const pingIds = [];
+    // Letras/números ASCII -> versão monoespaçada (𝙿𝙰𝚁𝚃𝚈 𝟷). Usado só no nome do grupo.
+    const mono = (str) => Array.from(str).map((ch) => {
+      const c = ch.codePointAt(0);
+      if (c >= 65 && c <= 90) return String.fromCodePoint(0x1D670 + c - 65);    // A-Z
+      if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D68A + c - 97);   // a-z
+      if (c >= 48 && c <= 57) return String.fromCodePoint(0x1D7F6 + c - 48);    // 0-9
+      return ch;
+    }).join("");
     const lines = [
-      `**${group}**`,
       `<t:${ts}:d> at <t:${ts}:t> ➜ <t:${ts}:R>`,
+      mono(group),
       "",
       ...members.map((m) => {
         const emoji = EMOJI_IDS[m.classId] || `:${m.cls}:`;
         let who = "";
         if (m.discord) { who = ` <@${m.discord}>`; pingIds.push(m.discord); }   // marca de verdade (ID cadastrado)
         else if (m.nick) who = ` @${m.nick}`;                                     // sem ID: só texto, sem notificação
-        // item lendário: classe + 5 espaços + triângulo vermelho + nick
-        return m.legend ? `${emoji}     :small_red_triangle:${who}` : emoji + who;
-      })
+        // item lendário: classe + 3 espaços + triângulo vermelho + nick
+        return m.legend ? `${emoji}   :small_red_triangle:${who}` : emoji + who;
+      }),
+      "",
+      "-"
     ];
     let res;
     try {
