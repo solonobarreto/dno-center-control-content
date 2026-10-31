@@ -48,7 +48,8 @@ const EMOJI_IDS = {
   flurry: "<:Flurry:1424611082877669397>",
   ruina: "<:Ruina:1424611113022132285>",
   defensio: "<:Defensio:1424612387931291689>",
-  // faltam (emoji não encontrado no servidor): silverhunter, windwalker, lightfury
+  lightfury: "<:Lightfury:1424611099256553513>",
+  // faltam (emoji não encontrado no servidor): silverhunter, windwalker
 };
 // Nome do emoji no Discord quando ele não está em EMOJI_IDS e o nome da classe no site é diferente (ex.: "Light Fury" -> :Lightfury:)
 const EMOJI_NAMES = { lightfury: "Lightfury" };
