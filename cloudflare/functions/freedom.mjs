@@ -50,6 +50,8 @@ const EMOJI_IDS = {
   defensio: "<:Defensio:1424612387931291689>",
   // faltam (emoji não encontrado no servidor): silverhunter, windwalker, lightfury
 };
+// Nome do emoji no Discord quando ele não está em EMOJI_IDS e o nome da classe no site é diferente (ex.: "Light Fury" -> :Lightfury:)
+const EMOJI_NAMES = { lightfury: "Lightfury" };
 const RARITIES = ["epic", "unique", "legend"];
 const LEVELS = [80, 90];
 
@@ -221,7 +223,7 @@ export async function onRequest(context) {
       mono(group),
       "",
       ...members.map((m) => {
-        const emoji = EMOJI_IDS[m.classId] || `:${m.cls}:`;
+        const emoji = EMOJI_IDS[m.classId] || `:${EMOJI_NAMES[m.classId] || m.cls}:`;
         let who = "";
         if (m.discord) { who = ` <@${m.discord}>`; pingIds.push(m.discord); }   // marca de verdade (ID cadastrado)
         else if (m.nick) who = ` @${m.nick}`;                                     // sem ID: só texto, sem notificação
