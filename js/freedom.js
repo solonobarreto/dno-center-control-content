@@ -300,7 +300,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (vars) Object.keys(vars).forEach((v) => { s = s.split("{" + v + "}").join(vars[v]); });
     return s;
   }
-  const groupName = (n) => t("group") + " " + n;
+  const SEND_CH = { pt: "Enviar para o canal {n}", es: "Enviar al canal {n}", en: "Send to channel {n}", ru: "Отправить в канал {n}",
+    fil: "Ipadala sa channel {n}", tl: "Ipadala sa channel {n}", id: "Kirim ke kanal {n}", zh: "发送到频道 {n}", fr: "Envoyer sur le canal {n}", de: "An Kanal {n} senden" };
+  const sendCh = (n) => (SEND_CH[lang().toLowerCase().split("-")[0]] || SEND_CH.en).replace("{n}", n);
+  const groupName = (n) => (lang().toLowerCase().startsWith("en") ? "PARTY" : "Grupo") + " " + n;
 
   // Textos estáticos do index.html (data-fd / data-fd-title / data-fd-ph)
   function applyStatic() {
@@ -414,6 +417,7 @@ document.addEventListener("DOMContentLoaded", () => {
     id: String(g.id || Math.random().toString(36).slice(2)),
     n: Number(g.n) || 1,
     size: g.rows.length,
+    hook: g.hook === 2 ? 2 : 1,   // chave de envio: 1 = esquerda (webhook 1) · 2 = direita (webhook 2)
     rows: g.rows.map((r) => ({ classId: (r && r.classId) || "", nick: (r && r.nick) || "", eid: (r && r.eid) || "" }))
   }));
   const groupOpen = new Set();  // grupos expandidos (gaveta); começam guardados
@@ -556,8 +560,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function removePerson(k) {
     const rec = db[k];
-    if (!rec || k === key(me)) return;
+    if (!rec) return;
     if (!window.confirm(t("confirmDelPerson", { p: rec.nick }))) return;
+    // Removendo o próprio nick: limpa "me" para não ser reenviado ao servidor e voltar a pedir o nick
+    if (k === key(me)) { me = ""; try { localStorage.removeItem(NICK_KEY); } catch (_) {} }
     delete db[k];
     openDrawers.delete(k);
     if (editor && editor.key === k) editor = null;
@@ -653,12 +659,10 @@ document.addEventListener("DOMContentLoaded", () => {
     add.onclick = () => { openDrawers.add(k); editor = { key: k, stage: "classes" }; renderSide(); };
 
     head.append(nickBtn, edit, add);
-    if (k !== key(me)) {
-      const del = h("button", "btn-close-guide fd-person-x", "✕");
-      del.type = "button"; del.title = t("delPerson"); del.setAttribute("aria-label", t("delPerson"));
-      del.onclick = () => removePerson(k);
-      head.appendChild(del);
-    }
+    const del = h("button", "btn-close-guide fd-person-x", "✕");
+    del.type = "button"; del.title = t("delPerson"); del.setAttribute("aria-label", t("delPerson"));
+    del.onclick = () => removePerson(k);
+    head.appendChild(del);
     dr.appendChild(head);
 
     if (open) {
@@ -1022,14 +1026,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // Enviar: pergunta o horário → confirma → posta no Discord (via servidor, que guarda o webhook)
   function startSend(g) {
     const members = g.rows.filter((r) => r.classId && classById(r.classId))
-      .map((r) => ({ classId: r.classId, cls: classById(r.classId).name, nick: r.nick || "", discord: (db[key(r.nick)] && db[key(r.nick)].discord) || "" }));
+      .map((r) => {
+        const e = entryFor(r);
+        const legend = !!(e && ((e.set && e.set.r === "legend") || (e.weapon && e.weapon.r === "legend")));
+        return { classId: r.classId, cls: classById(r.classId).name, nick: r.nick || "", discord: (db[key(r.nick)] && db[key(r.nick)].discord) || "", legend };
+      });
     // Sempre abre o seletor de data/hora; as checagens vêm depois de confirmar.
     openTimePicker(async (ts) => {
       if (!members.length) return toast(t("sendEmpty"));
       if (!sessionKey) return toast(t("sendNeedOnline"));
-      const r = await api("POST", { action: "discord", ts, group: groupName(g.n), members }, sessionKey);
-      if (r.status === 200) toast(t("sentOk", { g: groupName(g.n) }));
-      else if (r.status === 503) toast(t("sendNoHook"));
+      const hook = g.hook === 2 ? 2 : 1;
+      const r = await api("POST", { action: "discord", ts, group: groupName(g.n), members, hook }, sessionKey);
+      if (r.status === 200) toast(t("sentOk", { g: groupName(g.n) }) + " (" + hook + ")");
+      else if (r.status === 503) toast(t("sendNoHook") + " (" + hook + ")");
       else toast(t("sendFail"));
     });
   }
@@ -1088,8 +1097,29 @@ document.addEventListener("DOMContentLoaded", () => {
     head.appendChild(title);
 
     // Aviãozinho de papel (enviar) — só o ícone
-    const send = iconBtn("fd-send", "send", t("send"));
-    send.onclick = () => startSend(g);
+    // Chave de 2 posições: esquerda = webhook 1 · direita = webhook 2.
+    // Clicar no trilho move a chave; clicar no botão (aviãozinho) envia para o webhook da posição atual.
+    const send = h("div", "fd-switch");
+    send.setAttribute("role", "switch"); send.tabIndex = 0;
+    const lab1 = h("span", "fd-sw-lab l", "1"), lab2 = h("span", "fd-sw-lab r", "2");
+    const knob = iconBtn("fd-sw-knob", "send", "");
+    send.append(lab1, lab2, knob);
+    const paintSwitch = () => {
+      const n = g.hook === 2 ? 2 : 1;
+      send.dataset.pos = String(n);
+      send.setAttribute("aria-checked", n === 2 ? "true" : "false");
+      send.title = sendCh(n); knob.title = sendCh(n); knob.setAttribute("aria-label", sendCh(n));
+    };
+    const setHook = (n) => { g.hook = n; saveGroups(); paintSwitch(); };
+    send.onclick = (ev) => {
+      if (knob.contains(ev.target)) startSend(g);
+      else setHook(g.hook === 2 ? 1 : 2);
+    };
+    send.onkeydown = (ev) => {
+      if (ev.key === "ArrowLeft") { ev.preventDefault(); setHook(1); }
+      else if (ev.key === "ArrowRight") { ev.preventDefault(); setHook(2); }
+    };
+    paintSwitch();
 
     // Olhinho: vira a tabela (Classe/Nickname ⇄ buffs e debuffs da composição)
     const eye = iconBtn("fd-send fd-eye" + (compOpen.has(g.id) ? " on" : ""), "eye", t(compOpen.has(g.id) ? "viewTable" : "viewComp"));
@@ -1409,7 +1439,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $("freedomPassCancel").addEventListener("click", closePass);
   passOverlay.addEventListener("click", (e) => { if (e.target === passOverlay) closePass(); });
   $("closeFreedomBtn").addEventListener("click", closeFreedom);
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeFreedom(); });
+  // A janela FREEDOM só fecha pelo X (ou Esc): clicar fora dela não fecha mais.
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (timeBox) { closeTimePicker(); e.stopPropagation(); return; }

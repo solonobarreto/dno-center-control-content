@@ -7,7 +7,7 @@
 //   GET  -> { players: [...] }
 //   PUT  -> body { player, oldNick? } (cria/atualiza; se oldNick vier e for diferente, renomeia)
 //   DELETE -> body { nick } (remove a pessoa do database)
-//   POST -> body { action: "discord", ts, group, members: [{cls, nick}] } (posta a escalação no Discord; precisa de DISCORD_WEBHOOK_URL)
+//   POST -> body { action: "discord", ts, group, members: [{cls, nick, legend?}], hook: 1|2 } (posta a escalação no Discord; precisa de DISCORD_WEBHOOK_URL)
 //
 // Senha: variável de ambiente FREEDOM_PASSWORD (painel/wrangler); se não existir, usa 2846.
 
@@ -178,7 +178,7 @@ export async function onRequest(context) {
   }
 
   // Envia a escalação de um grupo para o Discord.
-  // Webhook: variável de ambiente DISCORD_WEBHOOK_URL (secret no painel/wrangler; nunca vai pro navegador).
+  // Webhooks: variáveis DISCORD_WEBHOOK_URL (canal 1) e DISCORD_WEBHOOK_URL_2 (canal 2) (secrets no painel/wrangler; nunca vai pro navegador).
   if (request.method === "POST") {
     const text = await request.text();
     if (text.length > 8000) return json({ error: "too_large" }, 413);
@@ -186,7 +186,9 @@ export async function onRequest(context) {
     try { body = JSON.parse(text); } catch (_) { return json({ error: "bad_json" }, 400); }
     if (!body || body.action !== "discord") return json({ error: "bad_action" }, 400);
 
-    const hook = env.DISCORD_WEBHOOK_URL;
+    // hook 1 (padrão) -> DISCORD_WEBHOOK_URL · hook 2 -> DISCORD_WEBHOOK_URL_2
+    const which = Number(body.hook) === 2 ? 2 : 1;
+    const hook = which === 2 ? env.DISCORD_WEBHOOK_URL_2 : env.DISCORD_WEBHOOK_URL;
     if (!hook) return json({ error: "webhook_missing" }, 503);
 
     const ts = Number(body.ts);
@@ -199,7 +201,8 @@ export async function onRequest(context) {
         classId: /^[a-z]{3,24}$/.test(String(m && m.classId)) ? String(m.classId) : "",
         discord: /^\d{5,25}$/.test(String((m && m.discord) || "").trim()) ? String(m.discord).trim() : "",
         cls: String((m && m.cls) || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 30),   // emoji: sem espaços (Dark Avenger -> DarkAvenger)
-        nick: clean(m && m.nick, 20)
+        nick: clean(m && m.nick, 20),
+        legend: !!(m && m.legend === true)
       }))
       .filter((m) => m.cls);
     if (!group || !members.length) return json({ error: "bad_group" }, 400);
@@ -214,7 +217,8 @@ export async function onRequest(context) {
         let who = "";
         if (m.discord) { who = ` <@${m.discord}>`; pingIds.push(m.discord); }   // marca de verdade (ID cadastrado)
         else if (m.nick) who = ` @${m.nick}`;                                     // sem ID: só texto, sem notificação
-        return emoji + who;
+        // item lendário: classe + 5 espaços + triângulo vermelho + nick
+        return m.legend ? `${emoji}     :small_red_triangle:${who}` : emoji + who;
       })
     ];
     let res;
