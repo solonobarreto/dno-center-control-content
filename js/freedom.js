@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const modal = $("freedomModal");
   const side = $("freedomSide");
+  let sideList = null;   // área rolável da lateral (o título DATABASE fica fora dela)
   const groupsBox = $("freedomGroups");
   const addGroupBtn = $("freedomAddGroupBtn");
   const statusEl = $("freedomStatus");
@@ -31,6 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const NICK_KEY = "dnoFreedomNick";
   const DB_KEY = "dnoFreedomDB";
   const GROUPS_KEY = "dnoFreedomGroups";
+  const GROUP_W = 400;   // largura do card de grupo (mantenha igual a .fd-group no CSS)
   const API = "/api/freedom";
   const LOCAL_PASS = "2846"; // só usado se o servidor não responder (modo local)
 
@@ -575,6 +577,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ------------------------------------------------------------ lateral esquerda
   // DATABASE [+]  →  uma gaveta por pessoa (nick + ID do Discord); dentro, as classes dela e o botão + para adicionar classes.
   function renderSide() {
+    const prevScroll = sideList ? sideList.scrollTop : 0;
     side.innerHTML = "";
     const head = h("div", "fd-side-head");
     head.appendChild(h("div", "fd-side-title", "DATABASE"));
@@ -585,6 +588,9 @@ document.addEventListener("DOMContentLoaded", () => {
       head.appendChild(plus);
     }
     side.appendChild(head);
+    // Só a lista rola; o título DATABASE fica congelado e a barra de rolagem começa abaixo dele
+    sideList = h("div", "fd-side-list");
+    side.appendChild(sideList);
 
     const form = personForm || (!me ? { mode: "first" } : null);
     if (form && form.mode !== "edit") renderPersonForm(form);
@@ -596,6 +602,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (form && form.mode === "edit" && form.key === k) renderPersonForm(form);
         else renderDrawer(k);
       });
+    sideList.scrollTop = prevScroll;
   }
 
   function renderPersonForm(form) {
@@ -624,7 +631,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const err = h("div", "fd-error");
     box.append(row, err);
-    side.appendChild(box);
+    sideList.appendChild(box);
     const submit = () => { const msg = savePerson(form.mode, form.key, input.value, did.value); if (msg) err.textContent = msg; };
     ok.onclick = submit;
     input.onkeydown = did.onkeydown = (e) => { if (e.key === "Enter") submit(); };
@@ -673,7 +680,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else buildList(body, k);
       dr.appendChild(body);
     }
-    side.appendChild(dr);
+    sideList.appendChild(dr);
   }
 
   function startEdit(entry, classId, k) {
@@ -1059,7 +1066,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // Colunas independentes: expandir um grupo só empurra os que estão abaixo dele NA MESMA coluna.
     const w = groupsBox.clientWidth - 32;
-    const cols = Math.max(1, w > 0 ? Math.floor((w + 14) / (330 + 14)) : 2);
+    const cols = Math.min(2, Math.max(1, w > 0 ? Math.floor((w + 14) / (GROUP_W + 14)) : 2));
     layoutCols = cols;
     const colEls = Array.from({ length: Math.min(cols, groups.length) }, () => {
       const c = h("div", "fd-col");
@@ -1072,7 +1079,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", () => {
     if (overlay.classList.contains("hidden") || !groups.length) return;
     const w = groupsBox.clientWidth - 32;
-    const cols = Math.max(1, Math.floor((w + 14) / (330 + 14)));
+    const cols = Math.min(2, Math.max(1, Math.floor((w + 14) / (GROUP_W + 14))));
     if (cols !== layoutCols) renderGroups();
   });
 
@@ -1097,28 +1104,26 @@ document.addEventListener("DOMContentLoaded", () => {
     head.appendChild(title);
 
     // Aviãozinho de papel (enviar) — só o ícone
-    // Chave de 2 posições: esquerda = webhook 1 · direita = webhook 2.
-    // Clicar no trilho move a chave; clicar no botão (aviãozinho) envia para o webhook da posição atual.
-    const send = h("div", "fd-switch");
-    send.setAttribute("role", "switch"); send.tabIndex = 0;
-    const lab1 = h("span", "fd-sw-lab l", "1"), lab2 = h("span", "fd-sw-lab r", "2");
-    const knob = iconBtn("fd-sw-knob", "send", "");
-    send.append(lab1, lab2, knob);
+    // Chave de 2 posições: esquerda = webhook 1 · direita = webhook 2 (só seleciona o canal).
+    // O botão de enviar (aviãozinho) fica FORA da chave e posta no webhook da posição atual.
+    const sw = h("div", "fd-switch");
+    sw.setAttribute("role", "switch"); sw.tabIndex = 0;
+    sw.append(h("span", "fd-sw-lab l", "1"), h("span", "fd-sw-lab r", "2"), h("span", "fd-sw-knob"));
+    const send = iconBtn("fd-send", "send", "");
     const paintSwitch = () => {
       const n = g.hook === 2 ? 2 : 1;
-      send.dataset.pos = String(n);
-      send.setAttribute("aria-checked", n === 2 ? "true" : "false");
-      send.title = sendCh(n); knob.title = sendCh(n); knob.setAttribute("aria-label", sendCh(n));
+      sw.dataset.pos = String(n);
+      sw.setAttribute("aria-checked", n === 2 ? "true" : "false");
+      sw.title = sendCh(n); send.title = sendCh(n); send.setAttribute("aria-label", sendCh(n));
     };
     const setHook = (n) => { g.hook = n; saveGroups(); paintSwitch(); };
-    send.onclick = (ev) => {
-      if (knob.contains(ev.target)) startSend(g);
-      else setHook(g.hook === 2 ? 1 : 2);
-    };
-    send.onkeydown = (ev) => {
+    sw.onclick = () => setHook(g.hook === 2 ? 1 : 2);
+    sw.onkeydown = (ev) => {
       if (ev.key === "ArrowLeft") { ev.preventDefault(); setHook(1); }
       else if (ev.key === "ArrowRight") { ev.preventDefault(); setHook(2); }
+      else if (ev.key === " " || ev.key === "Enter") { ev.preventDefault(); setHook(g.hook === 2 ? 1 : 2); }
     };
+    send.onclick = () => startSend(g);
     paintSwitch();
 
     // Olhinho: vira a tabela (Classe/Nickname ⇄ buffs e debuffs da composição)
@@ -1140,7 +1145,7 @@ document.addEventListener("DOMContentLoaded", () => {
       compOpen.delete(g.id); groupOpen.delete(g.id);
       saveGroups(); renderGroups();
     };
-    head.append(send, eye, del);
+    head.append(sw, send, eye, del);
     card.appendChild(head);
 
     const flip = h("div", "fd-flip");

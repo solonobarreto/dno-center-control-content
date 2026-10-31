@@ -4525,7 +4525,7 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
   border: 1px solid var(--accent-flame);
   border-radius: 8px;
   width: 100%;
-  max-width: 1080px;
+  max-width: 1200px;
   height: 84vh;
   display: flex;
   flex-direction: column;
@@ -4550,11 +4550,12 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
   flex: 0 0 290px;            /* largura fixa: abrir/fechar gaveta não muda a lateral nem o lado direito */
   box-sizing: border-box;
   padding: 14px;
-  overflow-y: scroll;         /* barra sempre presente: não "rouba" largura quando a gaveta abre */
-  scrollbar-gutter: stable;
+  overflow: hidden;           /* a lateral não rola: o título fica congelado e só .fd-side-list rola */
+  display: flex; flex-direction: column;
   background: var(--bg-panel-alt);
   border-right: 1px solid var(--accent-flame-soft);
 }
+.fd-side-list { flex: 1; min-height: 0; overflow-y: scroll; scrollbar-gutter: stable; margin-right: -8px; padding-right: 4px; }
 .fd-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .fd-main-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -4573,7 +4574,7 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
 }
 .fd-plus:hover { background: var(--accent-gold); color: var(--bg-void); box-shadow: 0 0 10px var(--accent-gold-soft); }
 .fd-groups {
-  flex: 1; overflow: auto; padding: 14px 16px;
+  flex: 1; overflow: auto; scrollbar-gutter: stable; padding: 14px 16px;
   display: flex; gap: 14px; align-items: flex-start;
 }
 .fd-col { display: flex; flex-direction: column; gap: 14px; flex: 0 0 auto; }
@@ -4733,7 +4734,7 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
 
 /* grupos */
 .fd-group {
-  width: 330px; background: var(--bg-inset); border: 1px solid var(--border-ember);
+  width: 400px; background: var(--bg-inset); border: 1px solid var(--border-ember);
   border-radius: 7px; overflow: hidden; align-self: flex-start;
 }
 .fd-group-head {
@@ -4764,7 +4765,7 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
   color: var(--text-faint); font-weight: 700; border-bottom: 1px solid var(--border-ember);
 }
 .fd-table td { padding: 3px 4px; width: 50%; }
-.fd-table td:first-child { padding-left: 6px; }
+.fd-table td:first-child { padding-left: 6px; width: 56%; }
 .fd-table td:last-child { padding-right: 6px; }
 .fd-slot {
   display: flex; align-items: center; gap: 6px; width: 100%; min-height: 38px; padding: 3px 6px; text-align: left;
@@ -4910,10 +4911,10 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
 .fd-time-no:hover { color: var(--text-primary); border-color: var(--accent-gold); }
 @media (max-width: 560px) { .fd-time-grid { grid-template-columns: 1fr; } }
 
-/* Chave de envio (webhook 1 ⇄ 2): o botão com o aviãozinho desliza entre as duas posições */
+/* Chave do webhook (1 ⇄ 2): mesmo raio dos botões (5px); o botão de enviar fica separado, ao lado */
 .fd-switch {
-  position: relative; display: inline-block; flex: none; width: 54px; height: 26px; box-sizing: border-box;
-  background: var(--bg-inset); border: 1px solid var(--accent-flame); border-radius: 13px;
+  position: relative; display: inline-block; flex: none; width: 54px; height: 26px;
+  background: var(--bg-inset); border: 1px solid var(--accent-flame); border-radius: 5px;
   cursor: var(--cursor-pointer); user-select: none;
 }
 .fd-sw-lab {
@@ -4922,11 +4923,8 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
 }
 .fd-sw-lab.l { left: 8px; } .fd-sw-lab.r { right: 8px; }
 .fd-sw-knob {
-  position: absolute; top: 1px; left: 1px; width: 22px; height: 22px; padding: 0; box-sizing: border-box;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--accent-flame); color: var(--bg-void); border: none; border-radius: 50%;
-  cursor: var(--cursor-pointer); transition: left 0.2s;
+  position: absolute; top: 2px; left: 2px; width: 24px; height: 20px;
+  background: var(--accent-flame); border-radius: 3px; transition: left 0.2s;
 }
-.fd-sw-knob svg { display: block; width: 12px; height: 12px; }
-.fd-switch[data-pos="2"] .fd-sw-knob { left: 29px; }
+.fd-switch[data-pos="2"] .fd-sw-knob { left: 26px; }
 .fd-switch:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 2px; }
