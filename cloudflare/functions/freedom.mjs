@@ -220,6 +220,7 @@ export async function onRequest(context) {
       return ch;
     }).join("");
     const lines = [
+      "   -",
       `<t:${ts}:d> at <t:${ts}:t> ➜ <t:${ts}:R>`,
       mono(group),
       "   -",
