@@ -4911,20 +4911,23 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
 .fd-time-no:hover { color: var(--text-primary); border-color: var(--accent-gold); }
 @media (max-width: 560px) { .fd-time-grid { grid-template-columns: 1fr; } }
 
-/* Chave do webhook (1 ⇄ 2): mesmo raio dos botões (5px); o botão de enviar fica separado, ao lado */
+/* Chave do webhook: esquerda = Geraint (webhook 1) · direita = Velskud (webhook 2). Mesmo raio dos botões (5px) */
 .fd-switch {
-  position: relative; display: inline-block; flex: none; width: 54px; height: 26px;
+  position: relative; display: inline-block; flex: none; width: 62px; height: 26px;
   background: var(--bg-inset); border: 1px solid var(--accent-flame); border-radius: 5px;
   cursor: var(--cursor-pointer); user-select: none;
 }
 .fd-sw-lab {
-  position: absolute; top: 0; bottom: 0; display: flex; align-items: center; font-size: 11px; font-weight: 700;
-  color: var(--text-faint); pointer-events: none;
+  position: absolute; top: 0; bottom: 0; width: 30px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--text-faint); pointer-events: none; opacity: 0.5; transition: opacity 0.2s;
 }
-.fd-sw-lab.l { left: 8px; } .fd-sw-lab.r { right: 8px; }
+.fd-sw-lab.l { left: 0; } .fd-sw-lab.r { right: 0; }
+.fd-sw-lab img { width: 20px; height: 20px; object-fit: contain; display: block; }
+.fd-switch[data-pos="1"] .fd-sw-lab.l, .fd-switch[data-pos="2"] .fd-sw-lab.r { opacity: 1; }
 .fd-sw-knob {
-  position: absolute; top: 2px; left: 2px; width: 24px; height: 20px;
-  background: var(--accent-flame); border-radius: 3px; transition: left 0.2s;
+  position: absolute; top: 2px; left: 2px; width: 28px; height: 20px;
+  background: var(--accent-flame-soft, rgba(255,120,40,0.35)); border: 1px solid var(--accent-flame); border-radius: 3px; box-sizing: border-box;
+  transition: left 0.2s;
 }
-.fd-switch[data-pos="2"] .fd-sw-knob { left: 26px; }
+.fd-switch[data-pos="2"] .fd-sw-knob { left: 30px; }
 .fd-switch:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 2px; }

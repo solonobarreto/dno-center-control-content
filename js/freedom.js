@@ -304,7 +304,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   const SEND_CH = { pt: "Enviar para o canal {n}", es: "Enviar al canal {n}", en: "Send to channel {n}", ru: "Отправить в канал {n}",
     fil: "Ipadala sa channel {n}", tl: "Ipadala sa channel {n}", id: "Kirim ke kanal {n}", zh: "发送到频道 {n}", fr: "Envoyer sur le canal {n}", de: "An Kanal {n} senden" };
-  const sendCh = (n) => (SEND_CH[lang().toLowerCase().split("-")[0]] || SEND_CH.en).replace("{n}", n);
+  const HOOK_NAMES = ["Geraint", "Velskud"];   // esquerda = webhook 1 (img/webhooks/geraint.png) · direita = webhook 2 (img/webhooks/velskud.png)
+  const sendCh = (n) => (SEND_CH[lang().toLowerCase().split("-")[0]] || SEND_CH.en).replace("{n}", HOOK_NAMES[n - 1]);
   const groupName = (n) => (lang().toLowerCase().startsWith("en") ? "PARTY" : "Grupo") + " " + n;
 
   // Textos estáticos do index.html (data-fd / data-fd-title / data-fd-ph)
@@ -1044,8 +1045,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!sessionKey) return toast(t("sendNeedOnline"));
       const hook = g.hook === 2 ? 2 : 1;
       const r = await api("POST", { action: "discord", ts, group: groupName(g.n), members, hook }, sessionKey);
-      if (r.status === 200) toast(t("sentOk", { g: groupName(g.n) }) + " (" + hook + ")");
-      else if (r.status === 503) toast(t("sendNoHook") + " (" + hook + ")");
+      if (r.status === 200) toast(t("sentOk", { g: groupName(g.n) }) + " (" + HOOK_NAMES[hook - 1] + ")");
+      else if (r.status === 503) toast(t("sendNoHook") + " (" + HOOK_NAMES[hook - 1] + ")");
       else toast(t("sendFail"));
     });
   }
@@ -1108,7 +1109,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // O botão de enviar (aviãozinho) fica FORA da chave e posta no webhook da posição atual.
     const sw = h("div", "fd-switch");
     sw.setAttribute("role", "switch"); sw.tabIndex = 0;
-    sw.append(h("span", "fd-sw-lab l", "1"), h("span", "fd-sw-lab r", "2"), h("span", "fd-sw-knob"));
+    const hookImg = (side, n) => {
+      const w = h("span", "fd-sw-lab " + side);
+      const im = document.createElement("img");
+      im.src = "img/webhooks/" + HOOK_NAMES[n - 1].toLowerCase() + ".png"; im.alt = HOOK_NAMES[n - 1]; im.draggable = false;
+      im.onerror = () => { w.textContent = String(n); };   // sem a imagem: mostra o número
+      w.appendChild(im);
+      return w;
+    };
+    sw.append(h("span", "fd-sw-knob"), hookImg("l", 1), hookImg("r", 2));
     const send = iconBtn("fd-send", "send", "");
     const paintSwitch = () => {
       const n = g.hook === 2 ? 2 : 1;
