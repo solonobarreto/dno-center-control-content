@@ -9,7 +9,8 @@ const json = (obj, status) => new Response(JSON.stringify(obj), { status, header
 
 // GET /api/status: diagnóstico rápido (banco D1, país detectado e leitura dos eventos).
 async function status(env, request) {
-  const out = { worker: "ok", build: "2026-10-12-a", country: (request.cf && request.cf.country) || null, db: null, events: null };
+  const out = { worker: "ok", build: "2026-10-31-a", country: (request.cf && request.cf.country) || null, db: null, events: null,
+    discord_webhook: env.DISCORD_WEBHOOK_URL ? "ok (configurado)" : "AUSENTE: crie o Secret DISCORD_WEBHOOK_URL no Worker que roda este site" };
   try {
     if (!env.DB) out.db = "ERRO: binding DB ausente (wrangler.toml / painel Bindings)";
     else {
