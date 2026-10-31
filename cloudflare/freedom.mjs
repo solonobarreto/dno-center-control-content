@@ -1,0 +1,181 @@
+// Cloudflare Function: banco de dados da área FREEDOM (Comunidade).
+// Guarda um registro por jogador: { nick, classes: [ { id, classId, set: {r,l}|null, weapon: {r,l}|null } ], updated }
+//   (a mesma classe pode aparecer várias vezes, cada uma com seu id; o formato antigo { <classId>: {set,weapon} } ainda é aceito e convertido)
+//   r = raridade ("epic" | "unique" | "legend"), l = nível (80 | 90)
+//
+// Rota: /api/freedom   (todas as chamadas exigem o cabeçalho x-freedom-key com a senha)
+//   GET  -> { players: [...] }
+//   PUT  -> body { player, oldNick? } (cria/atualiza; se oldNick vier e for diferente, renomeia)
+//   POST -> body { action: "discord", ts, group, members: [{cls, nick}] } (posta a escalação no Discord; precisa de DISCORD_WEBHOOK_URL)
+//
+// Senha: variável de ambiente FREEDOM_PASSWORD (painel/wrangler); se não existir, usa 2846.
+
+const DEFAULT_PASSWORD = "2846";
+const RARITIES = ["epic", "unique", "legend"];
+const LEVELS = [80, 90];
+
+// ---- Armazenamento em cima do D1 (mesma tabela kv usada por presence/party-share) ----
+let ready = null;
+async function ensure(db) {
+  if (!ready) {
+    ready = db
+      .prepare("CREATE TABLE IF NOT EXISTS kv (s TEXT NOT NULL, k TEXT NOT NULL, v TEXT NOT NULL, PRIMARY KEY (s, k))")
+      .run()
+      .catch((e) => { ready = null; throw e; });
+  }
+  return ready;
+}
+
+function getStore(env, name) {
+  const db = env.DB;
+  if (!db) throw new Error("Binding D1 'DB' não configurado (veja wrangler.toml).");
+  return {
+    async get(key) {
+      await ensure(db);
+      const r = await db.prepare("SELECT v FROM kv WHERE s = ?1 AND k = ?2").bind(name, key).first();
+      return r ? r.v : null;
+    },
+    async set(key, value) {
+      await ensure(db);
+      await db.prepare("INSERT INTO kv (s, k, v) VALUES (?1, ?2, ?3) ON CONFLICT (s, k) DO UPDATE SET v = excluded.v")
+        .bind(name, key, String(value)).run();
+    },
+    async delete(key) {
+      await ensure(db);
+      await db.prepare("DELETE FROM kv WHERE s = ?1 AND k = ?2").bind(name, key).run();
+    },
+    async list(prefix) {
+      await ensure(db);
+      const { results } = await db
+        .prepare("SELECT k, v FROM kv WHERE s = ?1 AND substr(k, 1, length(?2)) = ?2")
+        .bind(name, prefix || "").all();
+      return results.map((r) => ({ key: r.k, value: r.v }));
+    }
+  };
+}
+
+const json = (obj, status = 200) =>
+  new Response(JSON.stringify(obj), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+  });
+
+function cleanGear(g) {
+  if (!g || typeof g !== "object") return null;
+  const r = String(g.r);
+  const l = Number(g.l);
+  return RARITIES.includes(r) && LEVELS.includes(l) ? { r, l } : null;
+}
+
+const MAX_ENTRIES = 80;
+
+function cleanPlayer(p) {
+  if (!p || typeof p !== "object") return null;
+  const nick = String(p.nick || "").trim().replace(/\s+/g, " ");
+  if (!nick || nick.length > 20) return null;
+
+  // Aceita lista (novo) ou objeto { classId: {set,weapon} } (antigo).
+  let list = [];
+  if (Array.isArray(p.classes)) list = p.classes;
+  else if (p.classes && typeof p.classes === "object") {
+    list = Object.keys(p.classes).map((id) => ({ id, classId: id, ...(p.classes[id] || {}) }));
+  }
+  const classes = [];
+  const seen = new Set();
+  for (const e of list) {
+    if (!e || typeof e !== "object") continue;
+    const classId = String(e.classId || "");
+    if (!/^[a-z]{3,24}$/.test(classId)) continue;
+    const set = cleanGear(e.set);
+    const weapon = cleanGear(e.weapon);
+    if (!set && !weapon) continue;
+    let id = String(e.id || classId).replace(/[^a-zA-Z0-9]/g, "").slice(0, 24) || classId;
+    while (seen.has(id)) id += "x";
+    seen.add(id);
+    classes.push({ id, classId, set, weapon });
+    if (classes.length >= MAX_ENTRIES) break;
+  }
+  return { nick, classes, updated: Date.now() };
+}
+
+const pkey = (nick) => "p:" + String(nick).trim().toLowerCase();
+
+export async function onRequest(context) {
+  const { request, env } = context;
+  const password = env.FREEDOM_PASSWORD || DEFAULT_PASSWORD;
+  if (request.headers.get("x-freedom-key") !== password) return json({ error: "unauthorized" }, 401);
+
+  const store = getStore(env, "freedom");
+
+  if (request.method === "GET") {
+    const rows = await store.list("p:");
+    const players = [];
+    for (const row of rows) {
+      try {
+        const p = JSON.parse(row.value);
+        if (p && p.nick) players.push(p);
+      } catch (_) { /* registro corrompido: ignora */ }
+    }
+    return json({ players });
+  }
+
+  if (request.method === "PUT") {
+    const text = await request.text();
+    if (text.length > 20000) return json({ error: "too_large" }, 413);
+    let body;
+    try { body = JSON.parse(text); } catch (_) { return json({ error: "bad_json" }, 400); }
+    const player = cleanPlayer(body && body.player);
+    if (!player) return json({ error: "bad_player" }, 400);
+
+    const old = body && typeof body.oldNick === "string" ? body.oldNick.trim() : "";
+    if (old && old.toLowerCase() !== player.nick.toLowerCase()) {
+      // Renomear não pode sobrescrever o registro de outra pessoa.
+      if (await store.get(pkey(player.nick))) return json({ error: "nick_taken" }, 409);
+      await store.delete(pkey(old));
+    }
+    await store.set(pkey(player.nick), JSON.stringify(player));
+    return json({ ok: true, player });
+  }
+
+  // Envia a escalação de um grupo para o Discord.
+  // Webhook: variável de ambiente DISCORD_WEBHOOK_URL (secret no painel/wrangler; nunca vai pro navegador).
+  if (request.method === "POST") {
+    const text = await request.text();
+    if (text.length > 8000) return json({ error: "too_large" }, 413);
+    let body;
+    try { body = JSON.parse(text); } catch (_) { return json({ error: "bad_json" }, 400); }
+    if (!body || body.action !== "discord") return json({ error: "bad_action" }, 400);
+
+    const hook = env.DISCORD_WEBHOOK_URL;
+    if (!hook) return json({ error: "webhook_missing" }, 503);
+
+    const ts = Number(body.ts);
+    if (!Number.isInteger(ts) || ts < 1e9 || ts > 4e9) return json({ error: "bad_ts" }, 400);
+    // limpa o texto (uma linha, sem markdown/menções) e limita o tamanho
+    const clean = (v, n) => String(v == null ? "" : v).replace(/[\r\n]+/g, " ").replace(/[\\*_~`|>@]/g, "\\$&").trim().slice(0, n);
+    const group = clean(body.group, 40);
+    const members = (Array.isArray(body.members) ? body.members : []).slice(0, 8)
+      .map((m) => ({ cls: clean(m && m.cls, 30), nick: clean(m && m.nick, 20) }))
+      .filter((m) => m.cls);
+    if (!group || !members.length) return json({ error: "bad_group" }, 400);
+
+    const lines = [
+      `**${group}**`,
+      `<t:${ts}:d> at <t:${ts}:t> ➜ <t:${ts}:R>`,
+      "",
+      ...members.map((m) => (m.nick ? `${m.cls} — ${m.nick}` : m.cls))
+    ];
+    let res;
+    try {
+      res = await fetch(hook, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ content: lines.join("\n"), allowed_mentions: { parse: [] } })
+      });
+    } catch (_) { return json({ error: "discord_unreachable" }, 502); }
+    if (!res.ok) return json({ error: "discord_failed", status: res.status }, 502);
+    return json({ ok: true });
+  }
+
+  return json({ error: "method_not_allowed" }, 405);
+}

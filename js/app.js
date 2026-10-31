@@ -214,13 +214,14 @@ function saveCompSlots() {
   try { localStorage.setItem(COMP_SLOTS_KEY, JSON.stringify(compSlots)); } catch (_) {}
 }
 
-function computeCompTotals() {
+function computeCompTotals(slots) {
+  slots = Array.isArray(slots) ? slots : compSlots;
   const debuffTotals = {}; COMP_DEBUFF_FIELDS.forEach(([k]) => debuffTotals[k] = 0);
   const buffTotals = {}; COMP_BUFF_FIELDS.forEach(([k]) => buffTotals[k] = 0);
   const buffList = [];
   const debuffList = [];
 
-  compSlots.forEach((clsId) => {
+  slots.forEach((clsId) => {
     if (!clsId) return;
     const data = CLASS_COMP_DATA[clsId];
     const cls = ALL_CLASSES.find((c) => c.id === clsId);
@@ -776,6 +777,16 @@ document.addEventListener("DOMContentLoaded", () => {
   // textos estáticos do modal (hint, títulos de painel, botão Limpar) já
   // são cobertos pelo data-i18n/applyTranslations.
   window.refreshCompMaker = renderCompMaker;
+
+  // Reaproveitado pela área FREEDOM (buffs/debuffs do grupo).
+  window.DNOComp = {
+    renderStatGrid: renderCompStatGrid,
+    buildSkillIconsWrap: buildSkillIconsWrap,
+    appendFlexGroup: appendFlexGroup,
+    DEBUFF_FIELDS: COMP_DEBUFF_FIELDS,
+    BUFF_FIELDS: COMP_BUFF_FIELDS,
+    computeTotals: computeCompTotals
+  };
 });
 
 // Re-labels every already-rendered class icon (dropdown grid + character
@@ -2711,6 +2722,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof refreshClassLabels === "function") refreshClassLabels();
       if (typeof window.refreshCompMaker === "function") window.refreshCompMaker();
       if (typeof window.refreshAutoParty === "function") window.refreshAutoParty();
+      if (typeof window.refreshFreedom === "function") window.refreshFreedom();
       refreshContentLabels();
       if (typeof window.applyContentHeaderState === "function") window.applyContentHeaderState(); // reaplica o cabeçalho (Classe/Evento) no idioma novo
       if (typeof window.updateEventSublabels === "function") window.updateEventSublabels();

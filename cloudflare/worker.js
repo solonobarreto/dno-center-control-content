@@ -2,6 +2,7 @@
 // Só /api/* passa por aqui; o resto do site é servido como estático (veja wrangler.toml).
 import * as presence from "./functions/presence.mjs";
 import * as partyShare from "./functions/party-share.mjs";
+import * as freedom from "./functions/freedom.mjs";
 import * as events from "./functions/dno-events.js";
 
 const json = (obj, status) => new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
@@ -33,6 +34,7 @@ export default {
       if (pathname === "/api/status") return await status(env, request);
       if (pathname === "/api/presence") return await presence.onRequest(c);
       if (pathname === "/api/party-share") return await partyShare.onRequest(c);
+      if (pathname === "/api/freedom") return await freedom.onRequest(c);
       if (pathname === "/api/dno-events") {
         return request.method === "GET" || request.method === "HEAD" ? await events.onRequestGet() : json({ error: "method_not_allowed" }, 405);
       }

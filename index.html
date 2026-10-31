@@ -119,7 +119,12 @@
             <span class="menu-card-title" data-i18n="autoParty">Criador de Grupos</span>
             <span class="menu-card-desc" data-i18n="menuDescParty">Gera a melhor party a partir dos backups dos jogadores.</span>
           </button>
-          <button class="side-menu-item menu-card" id="openLanguageBtn">
+          <button class="side-menu-item menu-card" id="openFreedomBtn">
+          <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+          <span class="menu-card-title">FREEDOM</span>
+          <span class="menu-card-desc" data-fd="comm">Comunidade</span>
+        </button>
+        <button class="side-menu-item menu-card" id="openLanguageBtn">
             <span class="menu-card-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg></span>
             <span class="menu-card-title" data-i18n="idioma">Idioma</span>
             <span class="menu-card-desc" data-i18n="menuDescLang">Troque o idioma do site.</span>
@@ -355,8 +360,49 @@
     </div>
   </div>
 
+  <!-- FREEDOM: janela da senha -->
+  <div id="freedomPassOverlay" class="modal-overlay hidden">
+    <div class="fd-pass-box" id="freedomPassBox" role="dialog" aria-modal="true" aria-labelledby="freedomPassTitle">
+      <h3 id="freedomPassTitle">FREEDOM</h3>
+      <p data-fd="passInfo">Área da Comunidade. Digite a senha para entrar.</p>
+      <div class="fd-nick-row">
+        <input id="freedomPassInput" class="fd-input" type="password" inputmode="numeric" autocomplete="off" placeholder="Senha" data-fd-ph="passPh">
+      </div>
+      <div class="fd-error" id="freedomPassError" role="alert"></div>
+      <div class="fd-pass-actions">
+        <button type="button" class="fd-mini" id="freedomPassCancel" data-fd="cancel">Cancelar</button>
+        <button type="button" class="fd-mini fd-ok" id="freedomPassOk" data-fd="enter">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FREEDOM: área da Comunidade (desliza da esquerda, como as outras janelas) -->
+  <div id="freedomOverlay" class="modal-overlay hidden">
+    <div class="freedom-modal" id="freedomModal">
+      <div class="guide-modal-header">
+        <h3>FREEDOM <small data-fd="comm">Comunidade</small></h3>
+        <button id="closeFreedomBtn" class="btn-close-guide" title="Fechar" aria-label="Fechar" data-fd-title="close">✕</button>
+      </div>
+      <div class="fd-body">
+        <aside class="fd-side" id="freedomSide"></aside>
+        <section class="fd-main">
+          <div class="fd-main-head">
+            <span class="fd-main-title" data-fd="groups">Grupos</span>
+            <div class="fd-main-tools">
+              <span class="fd-status local" id="freedomStatus"></span>
+              <button type="button" class="fd-plus" id="freedomAddGroupBtn" title="Novo grupo" aria-label="Novo grupo" data-fd-title="newGroup">+</button>
+            </div>
+          </div>
+          <div class="fd-groups" id="freedomGroups"></div>
+        </section>
+      </div>
+      <div class="fd-toast" id="freedomToast" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+
   <script src="js/app.js"></script>
   <script src="js/manual.js"></script>
+  <script src="js/freedom.js"></script>
   <script>
   // =========================================================
   // i18n — internationalisation
