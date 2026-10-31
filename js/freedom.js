@@ -1331,7 +1331,16 @@ document.addEventListener("DOMContentLoaded", () => {
     openPop(anchor, (p) => {
       p.classList.add("fd-pop-nicks");
       const c = classById(row.classId);
-      p.appendChild(h("div", "fd-sub", t("whoHas", { c: c ? clsName(c) : "" })));
+      // Cabeçalho: título + X padrão no canto superior direito (remove o nick da linha)
+      const head = h("div", "fd-pop-head");
+      head.appendChild(h("div", "fd-sub", t("whoHas", { c: c ? clsName(c) : "" })));
+      if (row.nick) {
+        const x = h("button", "btn-close-guide fd-pop-x", "✕");
+        x.type = "button"; x.title = t("clearNick"); x.setAttribute("aria-label", t("clearNick"));
+        x.onclick = () => { row.nick = ""; row.eid = ""; saveGroups(); closePop(); renderGroups(); };
+        head.appendChild(x);
+      }
+      p.appendChild(head);
       if (!options.length) p.appendChild(h("div", "fd-empty-small", t("nobody")));
       options.forEach(({ pl, e }) => {
         const it = h("button", "fd-nick-item");
@@ -1342,12 +1351,6 @@ document.addEventListener("DOMContentLoaded", () => {
         it.onclick = () => { row.nick = pl.nick; row.eid = e.id; saveGroups(); closePop(); renderGroups(); };
         p.appendChild(it);
       });
-      if (row.nick) {
-        const clr = h("button", "fd-link", t("clearNick"));
-        clr.type = "button";
-        clr.onclick = () => { row.nick = ""; row.eid = ""; saveGroups(); closePop(); renderGroups(); };
-        p.appendChild(clr);
-      }
     });
   }
 

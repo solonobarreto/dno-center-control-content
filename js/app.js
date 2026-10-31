@@ -196,6 +196,7 @@ const COMP_BUFF_FIELDS = [
   ["mvspeed", "statMoveSpeed", "Mov. Speed"],        ["acspeed", "statActSpeed", "Act. Speed"],
   ["fd", "statFinalDmg", "Amp. Final Damage"]
 ];
+const COMP_ICE_AMP_CAP = 100;   // teto do Amp. Gelo (%)
 const COMP_SLOTS_KEY = "dnOriginsCompMaker";
 const COMP_SLOT_COUNT = 8;
 
@@ -260,6 +261,10 @@ function computeCompTotals(slots) {
       variableDebuffs: data.variableDebuffs || []
     });
   });
+
+  // Amp. Gelo (Ice Amp.) não acumula: independente de quantas classes tenham, o teto é 100%
+  // (ex.: Glaciana 100 + Adept 50 = 100%, não 150%).
+  if (debuffTotals.icestack > COMP_ICE_AMP_CAP) debuffTotals.icestack = COMP_ICE_AMP_CAP;
 
   return { debuffTotals, buffTotals, buffList, debuffList };
 }

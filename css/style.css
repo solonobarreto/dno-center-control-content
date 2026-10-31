@@ -4918,16 +4918,26 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
   cursor: var(--cursor-pointer); user-select: none;
 }
 .fd-sw-lab {
-  position: absolute; top: 0; bottom: 0; width: 30px; display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: var(--text-faint); pointer-events: none; opacity: 0.5; transition: opacity 0.2s;
+  position: absolute; top: 3px; width: 26px; height: 18px; overflow: hidden; border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--text-faint); pointer-events: none;
+  opacity: 0.4; filter: grayscale(0.7); transition: opacity 0.2s, filter 0.2s; z-index: 1;
 }
-.fd-sw-lab.l { left: 0; } .fd-sw-lab.r { right: 0; }
-.fd-sw-lab img { width: 20px; height: 20px; object-fit: contain; display: block; }
-.fd-switch[data-pos="1"] .fd-sw-lab.l, .fd-switch[data-pos="2"] .fd-sw-lab.r { opacity: 1; }
+.fd-sw-lab.l { left: 3px; } .fd-sw-lab.r { left: 31px; }
+/* zoom no personagem: a imagem enche o quadradinho e é ampliada, focando o rosto */
+.fd-sw-lab img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; transform: scale(1.7); transform-origin: 50% 22%; display: block; }
+.fd-switch[data-pos="1"] .fd-sw-lab.l, .fd-switch[data-pos="2"] .fd-sw-lab.r { opacity: 1; filter: none; }
+.fd-switch[data-pos="1"] .fd-sw-lab.l, .fd-switch[data-pos="2"] .fd-sw-lab.r { color: var(--bg-void); }
+/* moldura laranja no personagem selecionado */
 .fd-sw-knob {
-  position: absolute; top: 2px; left: 2px; width: 28px; height: 20px;
-  background: var(--accent-flame-soft, rgba(255,120,40,0.35)); border: 1px solid var(--accent-flame); border-radius: 3px; box-sizing: border-box;
+  position: absolute; top: 2px; left: 2px; width: 28px; height: 20px; box-sizing: border-box;
+  background: var(--accent-flame); border-radius: 3px; box-shadow: 0 0 8px var(--accent-flame-soft, rgba(255,120,40,0.4));
   transition: left 0.2s;
 }
 .fd-switch[data-pos="2"] .fd-sw-knob { left: 30px; }
 .fd-switch:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 2px; }
+
+/* Select nick: cabeçalho com X padrão no canto superior direito */
+.fd-pop-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.fd-pop-head .fd-sub { flex: 1; min-width: 0; }
+.fd-pop-x { padding: 2px 4px; flex: none; }
