@@ -1059,7 +1059,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return (row.eid && p.classes.find((e) => e.id === row.eid)) || p.classes.find((e) => e.classId === row.classId) || null;
   }
 
+  // Redesenhar a lista zera a rolagem; guarda a posição e devolve depois, para a janela não pular pro topo
   function renderGroups() {
+    const top = groupsBox.scrollTop, left = groupsBox.scrollLeft;
+    renderGroupsInner();
+    if (groupsBox.scrollTop !== top) groupsBox.scrollTop = top;
+    if (groupsBox.scrollLeft !== left) groupsBox.scrollLeft = left;
+  }
+  function renderGroupsInner() {
     groupsBox.innerHTML = "";
     if (!groups.length) {
       groupsBox.appendChild(h("div", "fd-empty", t("emptyGroups")));
