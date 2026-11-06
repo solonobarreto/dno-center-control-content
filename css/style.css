@@ -4791,6 +4791,9 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
 .fd-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; position: relative; min-width: 0; }
 .fd-face-back { transform: rotateY(180deg); }
 .fd-group:not(.comp) .fd-face-back, .fd-group.comp .fd-face-front { pointer-events: none; }
+/* Frente e verso dividem a mesma célula, então o card tinha a altura do verso (mais alto que 6 linhas).
+   Com o verso fechado ele não ocupa altura: o card cresce só conforme as linhas (6 ou 8). */
+.fd-group:not(.comp) .fd-face-back { height: 0; overflow: hidden; }
 
 /* verso: painéis compactos (reaproveitam as classes do Criador de Composições) */
 .fd-comp-wrap { position: relative; overflow: hidden; padding: 8px; min-height: 100%; }
