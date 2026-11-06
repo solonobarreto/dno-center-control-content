@@ -1320,12 +1320,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function openNickPop(anchor, g, i) {
     const row = g.rows[i];
-    // Itens já usados em outras linhas deste grupo (nick + item), para não repetir o mesmo personagem
+    // Personagens (nick + item do database) já usados em QUALQUER linha de QUALQUER grupo não aparecem de novo.
+    // Quem tem a mesma classe cadastrada 2x no database tem 2 itens diferentes, então ainda pode entrar 2 vezes.
     const used = new Set();
-    g.rows.forEach((r, j) => {
-      if (j === i || !r.nick) return;
-      const e = entryFor(r);
-      used.add(key(r.nick) + "|" + (e ? e.id : r.classId));
+    groups.forEach((gr) => {
+      gr.rows.forEach((r, j) => {
+        if ((gr === g && j === i) || !r.nick) return;
+        const e = entryFor(r);
+        used.add(key(r.nick) + "|" + (e ? e.id : r.classId));
+      });
     });
     const options = [];
     Object.values(db).forEach((pl) => {
