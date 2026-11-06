@@ -21,6 +21,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const side = $("freedomSide");
   let sideList = null;   // área rolável da lateral (o título DATABASE fica fora dela)
   const groupsBox = $("freedomGroups");
+  let rosterBox = null;                                   // lista "Selecionáveis" (à direita dos grupos)
+  let sideHidden = false;                                 // database oculto pela setinha
+  try { sideHidden = localStorage.getItem("dnoFdSideHidden") === "1"; } catch (_) {}
+  const UI_TXT = {   // [título da lista, coluna nick, coluna vezes, ocultar database, mostrar database]
+    pt: ["Selecionáveis", "Nick", "Vezes", "Ocultar database", "Mostrar database"],
+    en: ["Selectable", "Nickname", "Times", "Hide database", "Show database"],
+    es: ["Seleccionables", "Nick", "Veces", "Ocultar database", "Mostrar database"],
+    ru: ["Доступные", "Ник", "Раз", "Скрыть базу", "Показать базу"],
+    fr: ["Sélectionnables", "Pseudo", "Fois", "Masquer la base", "Afficher la base"],
+    de: ["Auswählbar", "Nick", "Mal", "Datenbank ausblenden", "Datenbank anzeigen"],
+    id: ["Dapat dipilih", "Nick", "Kali", "Sembunyikan database", "Tampilkan database"],
+    fil: ["Mapipili", "Nick", "Beses", "Itago ang database", "Ipakita ang database"],
+    zh: ["可选列表", "昵称", "次数", "隐藏数据库", "显示数据库"]
+  };
+  const uiTxt = () => UI_TXT[(typeof getCurrentLang === "function" ? getCurrentLang() : "pt-BR").toLowerCase().split("-")[0]] || UI_TXT.en;
   const addGroupBtn = $("freedomAddGroupBtn");
   const statusEl = $("freedomStatus");
   const toastEl = $("freedomToast");
@@ -588,6 +603,10 @@ document.addEventListener("DOMContentLoaded", () => {
       plus.onclick = () => { personForm = { mode: "add" }; renderSide(); };
       head.appendChild(plus);
     }
+    const hideBtn = h("button", "fd-plus fd-plus-sm fd-side-toggle", "<");
+    hideBtn.type = "button"; hideBtn.title = uiTxt()[3]; hideBtn.setAttribute("aria-label", uiTxt()[3]);
+    hideBtn.onclick = () => setSideHidden(true);
+    head.appendChild(hideBtn);
     side.appendChild(head);
     // Só a lista rola; o título DATABASE fica congelado e a barra de rolagem começa abaixo dele
     sideList = h("div", "fd-side-list");
@@ -812,6 +831,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Menu Lista → um cartão por item salvo (a mesma classe pode aparecer várias vezes):
   // ícone à esquerda e as bolinhas (S80 / W80) uma abaixo da outra, à direita. ✕ sempre visível para excluir.
+  // Carimbo "Dragon Nest" nos itens do database que já estão em algum grupo.
+  // Para usar a logo oficial, coloque o arquivo em img/carimbo-dn.png; se ele não existir, aparece o desenho padrão abaixo.
+  const STAMP_SRC = "img/carimbo-dn.png";
+  const STAMP_SVG = '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">'
+    + '<circle cx="32" cy="32" r="28"/><circle cx="32" cy="32" r="24" stroke-width="1"/>'
+    + '<path d="M32 12 L38 23 L50 19 L45 31 L52 43 L39 40 L32 52 L25 40 L12 43 L19 31 L14 19 L26 23 Z" fill="currentColor" fill-opacity=".28"/>'
+    + '<path d="M24 31 Q32 20 40 31 Q38 40 32 45 Q26 40 24 31 Z" fill="currentColor"/>'
+    + '<path d="M28 31 l2 2 M36 31 l-2 2" stroke="#000" stroke-width="1.6"/></svg>';
+  function makeStamp() {
+    const st = h("span", "fd-stamp");
+    const im = document.createElement("img");
+    im.src = STAMP_SRC; im.alt = ""; im.draggable = false;
+    im.onerror = () => { st.innerHTML = STAMP_SVG; };
+    st.appendChild(im);
+    return st;
+  }
+  // personagens (nick + item do database) escolhidos em qualquer grupo
+  function pickedSet() {
+    const set = new Set();
+    groups.forEach((gr) => gr.rows.forEach((r) => {
+      if (!r.nick) return;
+      const e = entryFor(r);
+      if (e) set.add(key(r.nick) + "|" + e.id);
+    }));
+    return set;
+  }
+  function refreshStamps() {
+    if (!sideList) return;
+    const picked = pickedSet();
+    sideList.querySelectorAll(".fd-tile").forEach((tl) => tl.classList.toggle("is-picked", picked.has(tl.dataset.pk + "|" + tl.dataset.eid)));
+  }
+
   function buildList(body, k) {
     const mine = recOf(k).classes;
     const items = mine
@@ -823,9 +874,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     const grid = h("div", "fd-list-grid");
+    const picked = pickedSet();
     items.forEach((e) => {
       const c = classById(e.classId);
       const tile = h("div", "fd-tile");
+      tile.dataset.pk = k; tile.dataset.eid = e.id;
+      if (picked.has(k + "|" + e.id)) tile.classList.add("is-picked");
+      tile.appendChild(makeStamp());
       tile.title = t("tileEdit", { c: clsName(c) });
       tile.appendChild(icon(c.id));
       tile.appendChild(chips(e));
@@ -1062,7 +1117,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Redesenhar a lista zera a rolagem; guarda a posição e devolve depois, para a janela não pular pro topo
   function renderGroups() {
     const top = groupsBox.scrollTop, left = groupsBox.scrollLeft;
+    ensureLayout();
     renderGroupsInner();
+    renderRoster();
+    refreshStamps();
     if (groupsBox.scrollTop !== top) groupsBox.scrollTop = top;
     if (groupsBox.scrollLeft !== left) groupsBox.scrollLeft = left;
   }
@@ -1084,6 +1142,57 @@ document.addEventListener("DOMContentLoaded", () => {
     groups.forEach((g, i) => colEls[i % colEls.length].appendChild(buildGroup(g)));
   }
   let layoutCols = 0;
+
+  // Estrutura extra criada por JS: [grupos | Selecionáveis] lado a lado + setinha ">" para reabrir o database
+  let showBtn = null;
+  function ensureLayout() {
+    if (rosterBox) return;
+    const body = h("div", "fd-main-body");
+    groupsBox.parentNode.insertBefore(body, groupsBox);
+    body.appendChild(groupsBox);
+    rosterBox = h("aside", "fd-roster");
+    body.appendChild(rosterBox);
+    const mainHead = groupsBox.closest(".fd-main").querySelector(".fd-main-head");
+    showBtn = h("button", "fd-plus fd-plus-sm fd-side-show", ">");
+    showBtn.type = "button";
+    showBtn.onclick = () => setSideHidden(false);
+    mainHead.insertBefore(showBtn, mainHead.firstChild);
+    applySideHidden();
+  }
+  function applySideHidden() {
+    modal.classList.toggle("fd-side-hidden", sideHidden);
+    if (showBtn) { showBtn.title = uiTxt()[4]; showBtn.setAttribute("aria-label", uiTxt()[4]); }
+  }
+  function setSideHidden(v) {
+    sideHidden = !!v;
+    try { localStorage.setItem("dnoFdSideHidden", sideHidden ? "1" : "0"); } catch (_) {}
+    applySideHidden();
+    renderGroups();
+  }
+
+  // Lista "Selecionáveis": todos os nicks do database + quantas vezes cada um foi escolhido nos grupos
+  function renderRoster() {
+    if (!rosterBox) return;
+    const T = uiTxt();
+    const counts = {};
+    groups.forEach((gr) => gr.rows.forEach((r) => { if (r.nick) counts[key(r.nick)] = (counts[key(r.nick)] || 0) + 1; }));
+    const list = Object.values(db)
+      .filter((pl) => pl && pl.nick)
+      .map((pl) => ({ nick: pl.nick, n: counts[key(pl.nick)] || 0 }))
+      .sort((a, b) => b.n - a.n || a.nick.localeCompare(b.nick));
+    rosterBox.innerHTML = "";
+    rosterBox.appendChild(h("div", "fd-roster-title", T[0]));
+    const head = h("div", "fd-roster-row fd-roster-headrow");
+    head.append(h("span", "fd-roster-nick", T[1]), h("span", "fd-roster-n", T[2]));
+    rosterBox.appendChild(head);
+    const box = h("div", "fd-roster-list");
+    list.forEach((it) => {
+      const row = h("div", "fd-roster-row" + (it.n ? "" : " zero"));
+      row.append(h("span", "fd-roster-nick", it.nick), h("span", "fd-roster-n", String(it.n)));
+      box.appendChild(row);
+    });
+    rosterBox.appendChild(box);
+  }
   window.addEventListener("resize", () => {
     if (overlay.classList.contains("hidden") || !groups.length) return;
     const w = groupsBox.clientWidth - 32;

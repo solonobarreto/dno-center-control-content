@@ -4525,7 +4525,7 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
   border: 1px solid var(--accent-flame);
   border-radius: 8px;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1480px;
   height: 84vh;
   display: flex;
   flex-direction: column;
@@ -4942,3 +4942,39 @@ em, i, .ap-note, [class*="subtitle"], [class*="note"] { font-style: normal; }
 .fd-pop-head .fd-sub { flex: 1; min-width: 0; }
 .fd-pop-x { padding: 2px 4px; flex: none; }
 .fd-pop-head-end { justify-content: flex-end; margin-bottom: 4px; }
+
+/* Carimbo Dragon Nest: item do database já escolhido em algum grupo */
+.fd-tile { position: relative; }
+.fd-stamp {
+  display: none; position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px;
+  transform: rotate(-14deg); color: var(--accent-flame); opacity: 0.92; pointer-events: none; z-index: 2;
+  filter: drop-shadow(0 0 3px rgba(0,0,0,0.85));
+}
+.fd-stamp img, .fd-stamp svg { width: 100%; height: 100%; object-fit: contain; display: block; }
+.fd-tile.is-picked .fd-stamp { display: block; }
+.fd-tile.is-picked > :not(.fd-stamp):not(.fd-tile-x) { opacity: 0.55; }
+
+/* Grupos à esquerda + lista "Selecionáveis" à direita */
+.fd-main-body { flex: 1; min-height: 0; display: flex; }
+.fd-main-body .fd-groups { flex: 1; min-width: 0; justify-content: flex-start; padding-left: 12px; }
+.fd-roster {
+  flex: 0 0 210px; width: 210px; box-sizing: border-box; padding: 12px 12px 12px 10px;
+  display: flex; flex-direction: column; min-height: 0;
+  border-left: 1px solid var(--border-ember); background: var(--bg-panel-alt);
+}
+.fd-roster-title { font-family: var(--font-display); font-size: 13px; letter-spacing: 0.06em; color: var(--accent-flame); margin: 0 0 8px 2px; }
+.fd-roster-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.fd-roster-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--border-ember); font-size: 12px; }
+.fd-roster-headrow { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); border-bottom: 1px solid var(--accent-flame-soft); }
+.fd-roster-nick { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fd-roster-n { flex: none; min-width: 22px; text-align: right; font-weight: 700; color: var(--accent-flame); }
+.fd-roster-row.zero { opacity: 0.5; }
+.fd-roster-row.zero .fd-roster-n { color: var(--text-faint); }
+
+/* Setinhas < / > para ocultar e reabrir o database */
+.fd-side-toggle { margin-left: 6px; }
+.fd-side-show { display: none; margin-right: 10px; }
+.freedom-modal.fd-side-hidden .fd-side { display: none; }
+.freedom-modal.fd-side-hidden .fd-side-show { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 900px) { .fd-roster { display: none; } }
+.fd-side-head .fd-side-title { flex: 1; }
