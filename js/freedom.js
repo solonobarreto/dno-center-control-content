@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const NICK_KEY = "dnoFreedomNick";
   const DB_KEY = "dnoFreedomDB";
   const GROUPS_KEY = "dnoFreedomGroups";
-  const GROUP_W = 400;   // largura do card de grupo (mantenha igual a .fd-group no CSS)
+  const GROUP_W = 332;   // largura do card de grupo (mantenha igual a .fd-group no CSS)
   const API = "/api/freedom";
   const LOCAL_PASS = "2846"; // só usado se o servidor não responder (modo local)
 
@@ -1131,7 +1131,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     // Colunas independentes: expandir um grupo só empurra os que estão abaixo dele NA MESMA coluna.
-    const w = groupsBox.clientWidth - 32;
+    const w = groupsBox.clientWidth - 24;
     const cols = Math.min(2, Math.max(1, w > 0 ? Math.floor((w + 14) / (GROUP_W + 14)) : 2));
     layoutCols = cols;
     const colEls = Array.from({ length: Math.min(cols, groups.length) }, () => {
@@ -1195,7 +1195,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   window.addEventListener("resize", () => {
     if (overlay.classList.contains("hidden") || !groups.length) return;
-    const w = groupsBox.clientWidth - 32;
+    const w = groupsBox.clientWidth - 24;
     const cols = Math.min(2, Math.max(1, Math.floor((w + 14) / (GROUP_W + 14))));
     if (cols !== layoutCols) renderGroups();
   });
