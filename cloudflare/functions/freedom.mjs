@@ -238,10 +238,14 @@ export async function onRequest(context) {
       res = await fetch(hook, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content: lines.join("\n"), allowed_mentions: { parse: [], users: pingIds } })
+        body: JSON.stringify({ content: lines.join("\n"), allowed_mentions: { parse: [], users: [...new Set(pingIds)] } })   // sem IDs repetidos: o Discord recusa a mensagem (400) se o mesmo ID aparecer 2x
       });
     } catch (_) { return json({ error: "discord_unreachable" }, 502); }
-    if (!res.ok) return json({ error: "discord_failed", status: res.status }, 502);
+    if (!res.ok) {
+      let detail = "";
+      try { detail = (await res.text()).slice(0, 300); } catch (_) {}
+      return json({ error: "discord_failed", status: res.status, hook: which, detail }, 502);   // detail = motivo devolvido pelo Discord
+    }
     return json({ ok: true });
   }
 
