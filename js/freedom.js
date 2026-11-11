@@ -24,16 +24,16 @@ document.addEventListener("DOMContentLoaded", () => {
   let rosterBox = null;                                   // lista "Selecionáveis" (à direita dos grupos)
   let sideHidden = false;                                 // database oculto pela setinha
   try { sideHidden = localStorage.getItem("dnoFdSideHidden") === "1"; } catch (_) {}
-  const UI_TXT = {   // [título da lista, coluna nick, coluna vezes, ocultar database, mostrar database]
-    pt: ["Selecionáveis", "Nick", "Vezes", "Ocultar database", "Mostrar database"],
-    en: ["Selectable", "Nickname", "Times", "Hide database", "Show database"],
-    es: ["Seleccionables", "Nick", "Veces", "Ocultar database", "Mostrar database"],
-    ru: ["Доступные", "Ник", "Раз", "Скрыть базу", "Показать базу"],
-    fr: ["Sélectionnables", "Pseudo", "Fois", "Masquer la base", "Afficher la base"],
-    de: ["Auswählbar", "Nick", "Mal", "Datenbank ausblenden", "Datenbank anzeigen"],
-    id: ["Dapat dipilih", "Nick", "Kali", "Sembunyikan database", "Tampilkan database"],
-    fil: ["Mapipili", "Nick", "Beses", "Itago ang database", "Ipakita ang database"],
-    zh: ["可选列表", "昵称", "次数", "隐藏数据库", "显示数据库"]
+  const UI_TXT = {   // [título da lista, coluna nick, coluna vezes, ocultar database, mostrar database, limpar grupo, jogador novo, confirmar limpar]
+    pt: ["Selecionáveis", "Nick", "Vezes", "Ocultar database", "Mostrar database", "Limpar grupo", "Jogador novo (sai no post como » ɴᴇᴡ)", "Limpar todas as linhas deste grupo?"],
+    en: ["Selectable", "Nickname", "Times", "Hide database", "Show database", "Clear group", "New player (shown in the post as » ɴᴇᴡ)", "Clear all rows of this group?"],
+    es: ["Seleccionables", "Nick", "Veces", "Ocultar database", "Mostrar database", "Limpiar grupo", "Jugador nuevo (sale en el post como » ɴᴇᴡ)", "¿Limpiar todas las filas de este grupo?"],
+    ru: ["Доступные", "Ник", "Раз", "Скрыть базу", "Показать базу", "Очистить группу", "Новичок (в посте: » ɴᴇᴡ)", "Очистить все строки группы?"],
+    fr: ["Sélectionnables", "Pseudo", "Fois", "Masquer la base", "Afficher la base", "Vider le groupe", "Nouveau joueur (affiché « » ɴᴇᴡ »)", "Vider toutes les lignes de ce groupe ?"],
+    de: ["Auswählbar", "Nick", "Mal", "Datenbank ausblenden", "Datenbank anzeigen", "Gruppe leeren", "Neuer Spieler (im Post: » ɴᴇᴡ)", "Alle Zeilen dieser Gruppe leeren?"],
+    id: ["Dapat dipilih", "Nick", "Kali", "Sembunyikan database", "Tampilkan database", "Kosongkan grup", "Pemain baru (tampil » ɴᴇᴡ)", "Kosongkan semua baris grup ini?"],
+    fil: ["Mapipili", "Nick", "Beses", "Itago ang database", "Ipakita ang database", "Linisin ang grupo", "Bagong player (» ɴᴇᴡ sa post)", "Linisin ang lahat ng row ng grupong ito?"],
+    zh: ["可选列表", "昵称", "次数", "隐藏数据库", "显示数据库", "清空队伍", "新玩家（帖子中显示 » ɴᴇᴡ）", "清空该队伍的所有行？"]
   };
   const uiTxt = () => UI_TXT[(typeof getCurrentLang === "function" ? getCurrentLang() : "pt-BR").toLowerCase().split("-")[0]] || UI_TXT.en;
   const addGroupBtn = $("freedomAddGroupBtn");
@@ -436,7 +436,7 @@ document.addEventListener("DOMContentLoaded", () => {
     n: Number(g.n) || 1,
     size: g.rows.length,
     hook: g.hook === 2 ? 2 : 1,   // chave de envio: 1 = esquerda (webhook 1) · 2 = direita (webhook 2)
-    rows: g.rows.map((r) => ({ classId: (r && r.classId) || "", nick: (r && r.nick) || "", eid: (r && r.eid) || "" }))
+    rows: g.rows.map((r) => ({ classId: (r && r.classId) || "", nick: (r && r.nick) || "", eid: (r && r.eid) || "", isNew: !!(r && r.isNew) }))
   }));
   const groupOpen = new Set();  // grupos expandidos (gaveta); começam guardados
   const compOpen = new Set();   // grupos que estão na visão "buffs/debuffs" (só na memória)
@@ -1092,7 +1092,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .map((r) => {
         const e = entryFor(r);
         const legend = !!(e && ((e.set && e.set.r === "legend") || (e.weapon && e.weapon.r === "legend")));
-        return { classId: r.classId, cls: classById(r.classId).name, nick: r.nick || "", discord: (db[key(r.nick)] && db[key(r.nick)].discord) || "", legend };
+        return { classId: r.classId, cls: classById(r.classId).name, nick: r.nick || "", discord: (db[key(r.nick)] && db[key(r.nick)].discord) || "", legend, isNew: !!r.isNew };
       });
     // Sempre abre o seletor de data/hora; as checagens vêm depois de confirmar.
     openTimePicker(async (ts) => {
@@ -1290,7 +1290,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const table = h("table", "fd-table");
     const thead = h("thead");
     const hr = h("tr");
-    hr.append(h("th", null, t("colClass")), h("th", null, t("colNick")));
+    // Vassoura (só na coluna CLASS): limpa todas as linhas do grupo
+    const thC = h("th");
+    const thBox = h("div", "fd-th-class");
+    thBox.appendChild(h("span", null, t("colClass")));
+    const broom = h("button", "fd-mini-btn fd-broom", "🧹");
+    broom.type = "button"; broom.title = uiTxt()[5]; broom.setAttribute("aria-label", uiTxt()[5]);
+    broom.onclick = () => {
+      if (!g.rows.some((r) => r.classId || r.nick)) return;
+      if (!window.confirm(uiTxt()[7])) return;
+      g.rows = g.rows.map(() => ({ classId: "", nick: "", eid: "", isNew: false }));
+      saveGroups(); closePop(); renderGroups();
+    };
+    thBox.appendChild(broom);
+    thC.appendChild(thBox);
+    hr.append(thC, h("th", null, t("colNick")));
     thead.appendChild(hr);
     table.appendChild(thead);
 
@@ -1322,7 +1336,19 @@ document.addEventListener("DOMContentLoaded", () => {
       nb.textContent = row.nick || t("selNick");
       nb.disabled = !cls;
       nb.onclick = () => openNickPop(nb, g, i);
-      tdN.appendChild(nb);
+      const cell = h("div", "fd-nickcell");
+      cell.appendChild(nb);
+      // Botão "new": marca jogador novo; no post do Discord o nick sai seguido de » ɴᴇᴡ
+      const nw = h("button", "fd-mini-btn fd-new" + (row.isNew ? " on" : ""), "new");
+      nw.type = "button"; nw.title = uiTxt()[6]; nw.setAttribute("aria-pressed", row.isNew ? "true" : "false");
+      nw.disabled = !cls;
+      nw.onclick = () => {
+        row.isNew = !row.isNew;
+        nw.classList.toggle("on", row.isNew); nw.setAttribute("aria-pressed", row.isNew ? "true" : "false");
+        saveGroups();
+      };
+      cell.appendChild(nw);
+      tdN.appendChild(cell);
 
       tr.append(tdC, tdN);
       tbody.appendChild(tr);
@@ -1459,7 +1485,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (row.nick) {
         const x = h("button", "btn-close-guide fd-pop-x", "✕");
         x.type = "button"; x.title = t("clearNick"); x.setAttribute("aria-label", t("clearNick"));
-        x.onclick = () => { row.nick = ""; row.eid = ""; saveGroups(); closePop(); renderGroups(); };
+        x.onclick = () => { row.nick = ""; row.eid = ""; row.isNew = false; saveGroups(); closePop(); renderGroups(); };
         head.appendChild(x);
       }
       p.appendChild(head);
