@@ -112,17 +112,17 @@ function renderClassNickLabel(labelEl, cls, nickname) {
 
   const nameSpan = document.createElement("span");
   nameSpan.className = "class-nickname-name";
-  nameSpan.textContent = `"${nickname}"`;
+  nameSpan.textContent = nickname;
 
   labelEl.appendChild(classSpan);
   labelEl.appendChild(nameSpan);
-  labelEl.title = `${className} "${nickname}"`; // nome completo ao passar o mouse (caso seja truncado)
+  labelEl.title = `${nickname} · ${className}`; // nome completo ao passar o mouse (caso seja truncado)
   labelEl.classList.toggle("nick-long", `${className} ${nickname}`.length >= 14);
 }
 window.renderClassNickLabel = renderClassNickLabel;
 
 // =========================================================
-// Simulador de Composições — dados de buff/debuff por classe
+// Criador de Composições — dados de buff/debuff por classe
 // (fonte: aba "BUFFS/DEBUFFS (DNO)" da planilha). Chaves batem
 // com os ids de ALL_CLASSES. "patk: '*'" = valor variável na
 // planilha original (não somado no total, mostrado como "*").
@@ -175,25 +175,28 @@ const CLASS_COMP_DATA = {
 // O segundo item de cada par é a chave de tradução (window.TRANSLATIONS),
 // não mais o texto fixo em português — renderCompStatGrid busca o rótulo
 // no idioma atual via i18n(), com o texto em pt-BR como fallback.
+// Quarto item opcional: "+" = status positivo (sinal +), padrão = negativo (sinal -).
+// Ordem: negativos nas linhas de cima, positivos na linha de baixo.
 const COMP_DEBUFF_FIELDS = [
-  ["pdef",  "statPDef", "DEF Física"],       ["mdef",  "statMDef", "DEF Mágica"],
-  ["patk",  "statPAtk", "ATK Físico"],       ["matk",  "statMAtk", "ATK Mágico"],
-  ["light", "statLight", "Luz"],             ["dark",  "statDark", "Trevas"],
-  ["ice",   "statIce", "Gelo"],              ["fire",  "statFire", "Fogo"],
-  ["resist","statResistCrit", "Resist. Crítico"],["critdmg","statCritDmg", "Dano Crítico"],
-  ["icestack","statIceAmp", "Amp. Gelo"]
+  ["light",   "debLightRes", "Resist. Luz"],    ["dark",    "debDarkRes", "Resist. Trevas"],
+  ["ice",     "debIceRes",   "Resist. Gelo"],   ["fire",    "debFireRes", "Resist. Fogo"],
+  ["resist",  "debCritRes",  "Resist. Crítica"],  ["critdmg", "statCritDmg", "Dano Crítico"],
+  ["patk",    "debRedPAtk",  "Redução ATK Físico"],["matk",    "debRedMAtk", "Redução ATK Mágico"],
+  ["pdef",    "debTakenPAtk", "ATK Físico Recebido", "+"], ["mdef", "debTakenMAtk", "ATK Mágico Recebido", "+"],
+  ["icestack","statIceAmp",  "Amp. Gelo"]
 ];
 const COMP_BUFF_FIELDS = [
-  ["pdef", "statPDef", "DEF Física"],        ["mdef", "statMDef", "DEF Mágica"],
-  ["patk", "statPAtk", "ATK Físico"],        ["matk", "statMAtk", "ATK Mágico"],
-  ["str",  "statStr", "Força"],              ["agi",  "statAgi", "Agilidade"],
-  ["int",  "statInt", "Inteligência"],       ["vit",  "statVit", "Vitality"],
-  ["light","statLight", "Luz"],              ["dark", "statDark", "Trevas"],
-  ["ice", "statIce", "Gelo"],                ["fire", "statFire", "Fogo"],
-  ["mvspeed", "statMoveSpeed", "Mov. Speed"],["acspeed", "statActSpeed", "Act. Speed"],
-  ["cd", "statCdReduction", "Red. Recarga"], ["crit", "statCritical", "Critical"],
+  ["pdef", "buffIncPDef", "Aumento DEF Física"],  ["mdef", "buffIncMDef", "Aumento DEF Mágica"],
+  ["patk", "buffIncPAtk", "Aumento ATK Físico"],  ["matk", "buffIncMAtk", "Aumento ATK Mágico"],
+  ["str",  "buffIncStr",  "Aumento FOR"],         ["agi",  "buffIncAgi",  "Aumento AGI"],
+  ["int",  "buffIncInt",  "Aumento INT"],         ["vit",  "buffIncVit",  "Aumento VIT"],
+  ["light","buffIncLight","Aumento ATK Luz"],  ["dark", "buffIncDark", "Aumento ATK Trevas"],
+  ["ice",  "buffIncIce",  "Aumento ATK Gelo"], ["fire", "buffIncFire", "Aumento ATK Fogo"],
+  ["crit", "buffIncCrit", "Aumento Crítico"],     ["cd", "statCdReduction", "Red. Recarga"],
+  ["mvspeed", "statMoveSpeed", "Mov. Speed"],        ["acspeed", "statActSpeed", "Act. Speed"],
   ["fd", "statFinalDmg", "Amp. Final Damage"]
 ];
+const COMP_ICE_AMP_CAP = 100;   // teto do Amp. Gelo (%)
 const COMP_SLOTS_KEY = "dnOriginsCompMaker";
 const COMP_SLOT_COUNT = 8;
 
@@ -212,13 +215,14 @@ function saveCompSlots() {
   try { localStorage.setItem(COMP_SLOTS_KEY, JSON.stringify(compSlots)); } catch (_) {}
 }
 
-function computeCompTotals() {
+function computeCompTotals(slots) {
+  slots = Array.isArray(slots) ? slots : compSlots;
   const debuffTotals = {}; COMP_DEBUFF_FIELDS.forEach(([k]) => debuffTotals[k] = 0);
   const buffTotals = {}; COMP_BUFF_FIELDS.forEach(([k]) => buffTotals[k] = 0);
   const buffList = [];
   const debuffList = [];
 
-  compSlots.forEach((clsId) => {
+  slots.forEach((clsId) => {
     if (!clsId) return;
     const data = CLASS_COMP_DATA[clsId];
     const cls = ALL_CLASSES.find((c) => c.id === clsId);
@@ -257,6 +261,10 @@ function computeCompTotals() {
       variableDebuffs: data.variableDebuffs || []
     });
   });
+
+  // Amp. Gelo (Ice Amp.) não acumula: independente de quantas classes tenham, o teto é 100%
+  // (ex.: Glaciana 100 + Adept 50 = 100%, não 150%).
+  if (debuffTotals.icestack > COMP_ICE_AMP_CAP) debuffTotals.icestack = COMP_ICE_AMP_CAP;
 
   return { debuffTotals, buffTotals, buffList, debuffList };
 }
@@ -518,10 +526,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderCompStatGrid(container, fields, totals, opts) {
     container.innerHTML = "";
-    fields.forEach(([key, labelKey, labelFallback]) => {
+    let positiveStarted = false;
+    fields.forEach(([key, labelKey, labelFallback, sign]) => {
       const val = totals[key] || 0;
       const cell = document.createElement("div");
       cell.className = "comp-stat-cell" + (val ? " comp-stat-cell-active" : "");
+      const isPositive = sign === "+";
+      // Primeiro status positivo sempre começa na coluna 1 (nova linha), separando dos negativos.
+      if (isPositive && !positiveStarted) { cell.style.gridColumnStart = "1"; }
+      if (isPositive) positiveStarted = true;
       const labelEl = document.createElement("span");
       labelEl.className = "comp-stat-label";
       labelEl.textContent = i18n(labelKey, labelFallback);
@@ -529,7 +542,7 @@ document.addEventListener("DOMContentLoaded", () => {
       valueEl.className = "comp-stat-value";
       const rounded = Math.round(val * 100) / 100;
       let text;
-      if (opts && opts.isDebuff) {
+      if (opts && opts.isDebuff && !isPositive) {
         text = (rounded ? "-" : "") + rounded + "%";
       } else {
         text = (rounded > 0 ? "+" : "") + rounded + "%";
@@ -764,11 +777,21 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Exposto para que a troca de idioma (index.html / listener de .lang-item)
-  // possa re-renderizar os rótulos dinâmicos do Simulador de Composições
+  // possa re-renderizar os rótulos dinâmicos do Criador de Composições
   // (grade de stats, título "Remover", texto "(preencher)" etc.) — os
   // textos estáticos do modal (hint, títulos de painel, botão Limpar) já
   // são cobertos pelo data-i18n/applyTranslations.
   window.refreshCompMaker = renderCompMaker;
+
+  // Reaproveitado pela área FREEDOM (buffs/debuffs do grupo).
+  window.DNOComp = {
+    renderStatGrid: renderCompStatGrid,
+    buildSkillIconsWrap: buildSkillIconsWrap,
+    appendFlexGroup: appendFlexGroup,
+    DEBUFF_FIELDS: COMP_DEBUFF_FIELDS,
+    BUFF_FIELDS: COMP_BUFF_FIELDS,
+    computeTotals: computeCompTotals
+  };
 });
 
 // Re-labels every already-rendered class icon (dropdown grid + character
@@ -1014,32 +1037,36 @@ const EVENT_CONTENTS = [
   {
     id: "crazy-duck-nest",
     labels: { en: "Crazy Duck Nest" },
-    until: "2026-10-04T22:00:00Z"   // fim: 5 de outubro 00:00 Server Time (= 04/10 22:00 UTC)
+    until: "2026-10-05T07:00:00Z"   // fim: 5 de outubro 09:00 Server Time = 04:00 Brasília (= 05/10 07:00 UTC)
     // sem "days": roda todo dia
   },
   {
     id: "althea-continent-exploration",
     labels: { en: "Althea Continent Exploration" },
     until: "2026-10-10T07:00:00Z", // fim: 10 de outubro 09:00 Server Time (= 10/10 07:00 UTC)
-    days: [5, 6, 0]                 // só sex/sáb/dom, contados em Server Time (ver isEventActiveNow)
+    days: [5, 6, 0]                 // sex/sáb/dom, com o dia virando às 04:00 de Brasília = 09:00 Server Time (ver isEventActiveNow)
   }
 ];
 
 // Está dentro do período (until) E, se o evento só roda em certos dias (days, índices
-// JS: domingo=0...sábado=6), hoje é um desses dias — contado em SERVER TIME, não no
-// horário local de quem está vendo a tela.
+// JS: domingo=0...sábado=6), hoje é um desses dias.
+// O "dia" do evento NÃO começa à meia-noite: começa no reset diário do jogo, 04:00 de Brasília
+// (GMT-3) = 09:00 de Server Time. Ou seja, um evento de sexta só aparece a partir de sexta 04:00
+// (Brasília) e não na quinta à noite, quando o relógio do servidor já virou para sexta.
+// Funciona igual em qualquer fuso de quem está vendo a tela.
+const EVENT_DAY_START_MS = 9 * 60 * 60 * 1000;   // 09:00 Server Time = 04:00 Brasília
 function isEventActiveNow(ev, nowMs) {
   if (ev.until && Date.parse(ev.until) <= nowMs) return false;
   if (ev.days && ev.days.length) {
-    const dow = new Date(nowMs + SERVER_TZ_OFFSET_MS).getUTCDay();
+    // Server Time deslocado -9h: os getters UTC passam a mostrar o "dia do jogo" (vira às 09:00 do servidor)
+    const dow = new Date(nowMs + SERVER_TZ_OFFSET_MS - EVENT_DAY_START_MS).getUTCDay();
     if (!ev.days.includes(dow)) return false;
   }
   return true;
 }
 
-// "04/10/2026 19:00 - Tempo restante: 5 dias 23 horas" — data/hora de fim convertidas para o
-// FUSO DO NAVEGADOR de quem está vendo (como o hammertime), + tempo restante em dias e horas,
-// no idioma escolhido. O horário original do patch (Server Time) vai no tooltip do chip.
+// "05/10/2026 - Tempo restante: 3 dias 5 horas" — data de fim (em horário de Brasília,
+// GMT-3, igual ao resto do site) + tempo restante em dias e horas, no idioma escolhido.
 // Sem "until" (evento sem data marcada no patch) devolve null e o chip fica só com o nome.
 // d/h = [singular, plural]; idiomas sem plural repetem a mesma palavra.
 const EVENT_TIME_WORDS = {
@@ -1054,35 +1081,20 @@ const EVENT_TIME_WORDS = {
   fr:      { left: "Temps restant",     d: ["jour", "jours"],   h: ["heure", "heures"] },
   de:      { left: "Verbleibende Zeit", d: ["Tag", "Tage"],     h: ["Stunde", "Stunden"] }
 };
-const pad2 = (n) => String(n).padStart(2, "0");
-// Data/hora no fuso local do navegador (getters locais já aplicam o fuso e o horário de verão).
-function formatLocalDateTime(ms) {
-  const d = new Date(ms);
-  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-function localTzLabel(ms) {
-  const off = -new Date(ms).getTimezoneOffset(); // minutos a leste de UTC
-  const sign = off >= 0 ? "+" : "-";
-  const abs = Math.abs(off);
-  const gmt = "GMT" + sign + pad2(Math.floor(abs / 60)) + (abs % 60 ? ":" + pad2(abs % 60) : "");
-  let zone = "";
-  try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (_) {}
-  return zone ? `${zone}, ${gmt}` : gmt;
-}
-function formatEventTooltip(untilMs) {
-  const server = new Date(untilMs + SERVER_TZ_OFFSET_MS);
-  const srv = `${pad2(server.getUTCDate())}/${pad2(server.getUTCMonth() + 1)}/${server.getUTCFullYear()} ${pad2(server.getUTCHours())}:${pad2(server.getUTCMinutes())}`;
-  return `${formatLocalDateTime(untilMs)} (${localTzLabel(untilMs)})  ·  Server Time: ${srv}`;
-}
 function formatEventSublabel(ev, nowMs) {
   if (!ev.until) return null;
   const untilMs = Date.parse(ev.until);
   if (!isFinite(untilMs)) return null;
+  const BR_TZ_OFFSET_MS = -3 * 60 * 60 * 1000;
+  const shifted = new Date(untilMs + BR_TZ_OFFSET_MS);
+  const dd = String(shifted.getUTCDate()).padStart(2, "0");
+  const mm = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = shifted.getUTCFullYear();
   const left = Math.max(0, untilMs - nowMs);
   const days = Math.floor(left / DAY_MS);
   const hours = Math.floor((left % DAY_MS) / (60 * 60 * 1000));
   const w = EVENT_TIME_WORDS[getCurrentLang()] || EVENT_TIME_WORDS.en;
-  return `${formatLocalDateTime(untilMs)} - ${w.left}: ${days} ${w.d[days === 1 ? 0 : 1]} ${hours} ${w.h[hours === 1 ? 0 : 1]}`;
+  return `${dd}/${mm}/${yyyy} - ${w.left}: ${days} ${w.d[days === 1 ? 0 : 1]} ${hours} ${w.h[hours === 1 ? 0 : 1]}`;
 }
 
 // Mantém "Tempo restante: X dias Y horas" atualizado sem precisar recriar os chips.
@@ -1091,7 +1103,6 @@ function updateEventSublabels() {
   document.querySelectorAll(".event-chip .chip-sublabel[data-until]").forEach((el) => {
     const t = formatEventSublabel({ until: el.dataset.until }, now);
     if (t && el.textContent !== t) el.textContent = t;
-    el.title = formatEventTooltip(Date.parse(el.dataset.until));
   });
 }
 window.updateEventSublabels = updateEventSublabels;
@@ -1100,14 +1111,22 @@ setInterval(updateEventSublabels, 30000);
 // Patch mais recente lido do dnorigins.com ({ title, url, published }) — usado no cabeçalho
 // da coluna quando ela está no modo Evento.
 // Semente: o tópico do patch de onde vêm os eventos da lista fixa acima. A busca automática
-// (Netlify Function) e o cache substituem isto pelo patch mais recente.
+// (Cloudflare Worker) e o cache substituem isto pelo patch mais recente.
 let EVENT_PATCH = { title: "[Patch] 20-09-2026", url: "https://dnorigins.com/news/patch-20-09-2026/" };
 
 // Busca automática dos eventos: a cada importação de backup (e ao abrir a página) o site consulta
-// a Netlify Function netlify/functions/dno-events.js, que lê o [Patch] mais recente de
+// a Function cloudflare/functions/api/dno-events.js, que lê o [Patch] mais recente de
 // dnorigins.com/news. Sem a função no ar (ex.: abrindo o index.html direto do computador),
 // a busca falha em silêncio e continua valendo a última lista conhecida.
-const EVENTS_ENDPOINT = "/.netlify/functions/dno-events";
+// Ambiente: o site roda em dois cenários.
+//  • Com servidor (Cloudflare publicado ou `wrangler dev`): as Functions (/api/presence, /api/party-share,
+//    /api/dno-events) existem e tudo funciona (contador real, convites, eventos).
+//  • Aberto direto do computador (file://): não há Functions; o navegador bloqueia qualquer fetch. Nesse modo o
+//    site nem tenta chamá-las (sem erros no console) e usa os fallbacks locais (contador local, última lista de eventos).
+// Um servidor estático simples (ex.: python -m http.server) responde 404 às Functions; isso é detectado em runtime
+// (apiMissing, no bloco de presença) e as chamadas passam a ser raras.
+const DNO_IS_FILE = location.protocol === "file:";
+const EVENTS_ENDPOINT = "/api/dno-events";
 const EVENTS_CACHE_KEY = "dnoEventsCache";
 
 const EVENT_EMPTY_TEXT = {
@@ -1126,12 +1145,24 @@ function getEventEmptyText() {
   return EVENT_EMPTY_TEXT[getCurrentLang()] || EVENT_EMPTY_TEXT.en;
 }
 
+// Os patch notes dão a data de fim como 00:00 de Server Time (UTC+2 = 22:00 UTC do dia anterior).
+// Mas o "dia" do jogo vira às 09:00 Server Time = 04:00 Brasília, então o evento só termina nesse
+// horário. Se o "until" cair exatamente em 00:00 do servidor, empurra para 09:00 do servidor.
+function normalizeEventUntil(until) {
+  if (!until) return null;
+  const ms = Date.parse(until);
+  if (!isFinite(ms)) return until;
+  const serverMs = ms + SERVER_TZ_OFFSET_MS;
+  if (serverMs % DAY_MS === 0) return new Date(ms + EVENT_DAY_START_MS).toISOString();
+  return until;
+}
+
 // Troca a lista de eventos em uso (mantém o mesmo array, que é lido em vários lugares).
 function setEventList(list) {
   EVENT_CONTENTS.splice(0, EVENT_CONTENTS.length, ...list.map((e) => ({
     id: e.id,
     labels: e.labels || { en: e.name || e.id },
-    until: e.until || null,
+    until: normalizeEventUntil(e.until),
     days: Array.isArray(e.days) && e.days.length ? e.days : undefined
   })));
 }
@@ -1293,8 +1324,27 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Backup - Import
-  importBtn.addEventListener("click", (e) => {
+  // Com a File System Access API (Chrome/Edge) o arquivo é aberto por um handle: assim o Auto-save passa a
+  // gravar NESSE mesmo arquivo importado a cada mudança. Sem a API (ou se falhar), cai no input de arquivo.
+  importBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
+    if (typeof window.showOpenFilePicker === "function") {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          multiple: false,
+          types: [{ description: "Dragon Nest Backup", accept: { "application/json": [".json"] } }]
+        });
+        const file = await handle.getFile();
+        // Libera a escrita já agora (ainda dentro do gesto do clique); se o navegador negar, o Auto-save pede depois.
+        try { await handle.requestPermission({ mode: "readwrite" }); } catch (_) { /* pedido de novo no próximo clique */ }
+        window.dispatchEvent(new CustomEvent("dn:import-handle", { detail: { handle, name: file.name } }));
+        importData(file);
+        return;
+      } catch (err) {
+        if (err && err.name === "AbortError") return;   // cancelou o seletor
+        // qualquer outro erro: usa o método antigo abaixo
+      }
+    }
     importFileInput.click();
   });
 
@@ -1306,7 +1356,9 @@ document.addEventListener("DOMContentLoaded", () => {
     importFileInput.value = "";
   });
 
-  async function exportData() {
+  // Monta o objeto de backup a partir da tabela. Separado do exportData para poder ser
+  // reutilizado (ex.: Criador de Grupos → convite online, que envia uma versão enxuta).
+  function buildBackupData() {
     const data = { savedAt: Date.now(), characters: [], presets: presets.map((p) => ({ name: p.name, contents: [...p.contents] })) };
 
     document.querySelectorAll("#tablesWrapper tbody tr").forEach((row) => {
@@ -1333,6 +1385,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       data.characters.push({ classId, nickname, gear, contents, events: collectDoneEvents(row) });
     });
+
+    return data;
+  }
+  window.buildBackupData = buildBackupData;
+
+  async function exportData() {
+    const data = buildBackupData();
 
     const jsonStr = JSON.stringify(data, null, 2);
     const dateStr = new Date().toISOString().slice(0, 10);
@@ -2339,7 +2398,6 @@ document.addEventListener("DOMContentLoaded", () => {
         sub = document.createElement("span");
         sub.className = "chip-sublabel";
         sub.dataset.until = ev.until;
-        sub.title = formatEventTooltip(Date.parse(ev.until));
         sub.textContent = sublabelText;
       }
 
@@ -2379,10 +2437,11 @@ document.addEventListener("DOMContentLoaded", () => {
   window.rebuildEventChips = rebuildEventChips;
 
   let eventsFetching = null;
-  // Consulta o site (via Netlify Function) e atualiza a coluna Event Content.
+  // Consulta o site (via Worker) e atualiza a coluna Event Content.
   // Chamada a cada importação de backup e uma vez ao abrir a página.
   window.refreshEventsFromSite = function () {
     if (eventsFetching) return eventsFetching;
+    if (DNO_IS_FILE) return Promise.resolve(false);   // sem Functions em file://: segue com a última lista conhecida
     eventsFetching = fetch(EVENTS_ENDPOINT, { cache: "no-store" })
       .then((res) => { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .then((data) => {
@@ -2668,6 +2727,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof refreshClassLabels === "function") refreshClassLabels();
       if (typeof window.refreshCompMaker === "function") window.refreshCompMaker();
       if (typeof window.refreshAutoParty === "function") window.refreshAutoParty();
+      if (typeof window.refreshFreedom === "function") window.refreshFreedom();
       refreshContentLabels();
       if (typeof window.applyContentHeaderState === "function") window.applyContentHeaderState(); // reaplica o cabeçalho (Classe/Evento) no idioma novo
       if (typeof window.updateEventSublabels === "function") window.updateEventSublabels();
@@ -2728,11 +2788,224 @@ document.addEventListener("DOMContentLoaded", () => {
   // FEATURE 1: Screenshot / copy-to-clipboard button
   // -------------------------------------------------------
   const screenshotBtn = document.getElementById("screenshotBtn");
+  const shotImgCache = new Map();   // url -> Promise<dataURL>: imagens do próprio site embutidas na captura
+  let shotBusy = false;
+  let shotFontCSS = null;   // CSS das fontes (Cinzel etc.) embutido no print; calculado uma vez e reaproveitado
+  const HTI_SRC = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+  // Fora da captura: o que não aparece no print (scripts, modais/painéis fechados com a classe .hidden, iframes e
+  // o que é marcado com data-html2canvas-ignore). Menos nós = captura bem mais leve e menos tempo com a tela presa.
+  const SHOT_SKIP_TAGS = new Set(["SCRIPT", "NOSCRIPT", "TEMPLATE", "IFRAME"]);
+  const shotSkip = (el) => {
+    if (!el || el.nodeType !== 1) return false;
+    if (SHOT_SKIP_TAGS.has(el.tagName)) return true;
+    if (el.hasAttribute && el.hasAttribute("data-html2canvas-ignore")) return true;
+    if (el.classList && el.classList.contains("hidden")) return true;
+    // Face oculta da coluna de conteúdo (Class ⇄ Event): o verso é absolute e não define a altura da célula,
+    // então quando não está visível não precisa ser clonado (metade dos nós a menos = captura bem mais leve).
+    if (el.classList && el.classList.contains("content-face-back") &&
+        !document.documentElement.classList.contains("events-view")) return true;
+    return false;
+  };
+  const shotFilter = (node) => !shotSkip(node);
+  // Mapa de ícones embutidos (js/class-icons.js): procura o nome exato e, se não achar, ignorando maiúsculas/minúsculas
+  const lookupClassIcon = (map, name) => {
+    if (!map || !name) return null;
+    if (map[name]) return map[name];
+    const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, "");   // "Dark Avenger" = "darkavenger"
+    const n = norm(name);
+    for (const k in map) if (norm(k) === n) return map[k];
+    return null;
+  };
+  // Escalas de captura: alvo 1080p (largura 1920 px). Menos pixels = o navegador codifica o PNG quase na hora,
+  // sem prender a tela. Limita também o total de pixels (páginas muito altas) e tenta escala 1 se a primeira falhar.
+  // Qualidade: alvo 2x (largura ~3840 px) para o zoom ficar nítido; o teto de pixels protege páginas muito altas
+  // e, se a escala alta falhar, tenta 1.5x e depois 1x antes de desistir.
+  const SHOT_TARGET_W = 3840;   // 4K (UHD): a imagem final sai com 3840 px de largura
+  const SHOT_MAX_PIXELS = 36e6; // teto de segurança (memória do navegador) para páginas muito altas
+  const computeShotScales = () => {
+    const w = Math.max(document.body.scrollWidth, document.documentElement.clientWidth) || 1;
+    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) || 1;
+    let t = SHOT_TARGET_W / w;
+    t = Math.max(1, Math.min(t, 3, Math.sqrt(SHOT_MAX_PIXELS / (w * h))));
+    const list = [t];
+    if (t > 2) list.push(2);
+    if (t > 1.5) list.push(1.5);
+    if (t > 1) list.push(1);
+    return list;
+  };
+  // ---- Fontes no print ----
+  // Antes: se a 1ª tentativa de embutir as fontes falhasse (ou rodasse antes do Google Fonts terminar de carregar),
+  // o resultado vazio ficava em cache para sempre e todos os prints saíam com fonte genérica (Segoe/serif).
+  // Agora: só guarda em cache quando deu certo; espera document.fonts.ready; e, se o html-to-image não conseguir,
+  // monta o CSS das fontes por conta própria (baixa o CSS do Google Fonts + cada .woff2 e converte em data URL).
+  const hasEmbeddedFonts = (css) => /@font-face/i.test(css || "") && /url\(\s*["']?data:/i.test(css);
+  const blobToDataURL = (bl) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(bl); });
+  const buildGoogleFontCSS = async () => {
+    const links = Array.from(document.querySelectorAll('link[rel="stylesheet"][href*="fonts.googleapis.com"]'));
+    const URL_RE = /url\((["']?)(https?:[^)"']+)\1\)/g;
+    let out = "";
+    for (const l of links) {
+      let css = await (await fetch(l.href)).text();
+      const urls = Array.from(new Set(Array.from(css.matchAll(URL_RE)).map((m) => m[2])));
+      const map = {};
+      await Promise.all(urls.map(async (u) => {
+        try { map[u] = await blobToDataURL(await (await fetch(u)).blob()); } catch (e) { console.warn("Screenshot: fonte não baixou", u, e); }
+      }));
+      out += css.replace(URL_RE, (all, q, u) => (map[u] ? 'url("' + map[u] + '")' : all)) + "\n";
+    }
+    return out;
+  };
+  const getShotFontCSS = async () => {
+    if (shotFontCSS) return shotFontCSS;
+    try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (_) {}
+    let css = "";
+    try { css = await htmlToImage.getFontEmbedCSS(document.body, { filter: shotFilter }); } catch (e) { console.warn("Screenshot: getFontEmbedCSS falhou", e); }
+    if (!hasEmbeddedFonts(css)) {
+      try { css = await buildGoogleFontCSS(); } catch (e) { console.warn("Screenshot: fontes manuais falharam", e); }
+    }
+    if (hasEmbeddedFonts(css)) shotFontCSS = css;
+    else console.warn("Screenshot: fontes NÃO embutidas — o print vai sair com a fonte padrão");
+    return css;
+  };
+  // Captura rápida com html-to-image: usa o próprio motor do navegador (mantém ícones e SVGs) e é bem mais
+  // leve que o html2canvas. Se falhar, o caminho antigo (html2canvas) assume.
+  const captureFast = async () => {
+    if (typeof htmlToImage === "undefined") await loadScript(HTI_SRC);
+    if (typeof htmlToImage === "undefined") throw new Error("html-to-image indisponível");
+    // Desfaz o giro 3D da coluna de conteúdo só durante a captura (visualmente idêntico ao estado atual)
+    const eventsView = document.documentElement.classList.contains("events-view");
+    const st = document.createElement("style");
+    st.textContent =
+      ".content-flip{perspective:none!important}" +
+      ".content-flip-inner{transform:none!important;transition:none!important;transform-style:flat!important}" +
+      ".content-face{backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+      ".content-face-back{transform:none!important}" +
+      // sem animações/transições durante a captura: o navegador não recalcula estilos animados enquanto clona
+      "*,*::before,*::after{animation-play-state:paused!important;transition:none!important}" +
+      // Ícone de classe: na clonagem, will-change/backface-visibility + sombra neon geram um "fantasma" roxo borrado
+      // fora do lugar e o ícone some. Durante a captura vira uma caixa simples com a mesma borda neon (sem sombra).
+      ".class-cell-wrapper,.btn-gear-mini,.btn-add-content-mini,.btn-remove-row,.gear-bubble,.class-nickname{will-change:auto!important;backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+      // Neon roxo do ícone de volta no print (mesmos valores do style.css). O "fantasma" borrado vinha de will-change +
+      // backface-visibility junto com a sombra; como essas duas já são neutralizadas acima, a sombra pode voltar.
+      ".class-cell-wrapper{box-shadow:0 0 0 1px rgba(184,129,252,.18),0 0 8px 1px rgba(184,129,252,.45),0 0 16px 2px rgba(184,129,252,.22),inset 0 0 8px rgba(184,129,252,.18)!important;border:1px solid rgba(184,129,252,.55)!important;transform:none!important;filter:none!important}" +
+      ".class-cell-wrapper img{display:block!important;opacity:1!important;visibility:visible!important}" +
+      // Botão "+": a cruz é desenhada com ::before/::after, e na clonagem do html-to-image ela saía duplicada
+      // (um "+" escuro deslocado por cima do outro). Durante a captura a cruz vira dois degradês no próprio fundo.
+      ".btn-add-content-mini::before,.btn-add-content-mini::after{content:none!important;display:none!important}" +
+      ".btn-add-content-mini{box-shadow:none!important;background-color:var(--accent-flame)!important;" +
+        "background-image:linear-gradient(currentColor,currentColor),linear-gradient(currentColor,currentColor)!important;" +
+        "background-size:8px 2px,2px 8px!important;background-position:center,center!important;background-repeat:no-repeat!important}" +
+      (eventsView ? ".content-face-front{visibility:hidden!important}" : ".content-face-back{visibility:hidden!important}");
+    document.head.appendChild(st);
+    // Ícones/imagens do próprio site: troca o src por data URL (cache) ANTES de capturar e espera decodificar.
+    // Assim o ícone de classe já está pronto e embutido quando o html-to-image clona a página (antes ele
+    // podia clonar a <img> ainda sem pixels e o ícone saía vazio). O src original é restaurado no final.
+    const swapped = [];
+    try {
+      const imgs = Array.from(document.querySelectorAll("#tablesWrapper img, .class-cell-wrapper img"));
+      await Promise.all(imgs.map(async (img) => {
+        try {
+          const raw = img.getAttribute("src") || "";
+          if (!raw || /^(data|blob):/i.test(raw)) return;
+          const u = new URL(raw, location.href);
+          if (u.origin !== location.origin) return;
+          let p = shotImgCache.get(u.href);
+          if (!p) {
+            p = fetch(u.href).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
+              .then((bl) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(bl); }));
+            shotImgCache.set(u.href, p);
+          }
+          let data;
+          try { data = await p; } catch (e) {
+            shotImgCache.delete(u.href);
+            // fetch falhou: reaproveita a imagem já carregada na tela, desenhando-a num canvas
+            if (!img.complete || !img.naturalWidth) throw e;
+            const cv = document.createElement("canvas");
+            cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+            cv.getContext("2d").drawImage(img, 0, 0);
+            data = cv.toDataURL("image/png");
+          }
+          swapped.push([img, raw, img.getAttribute("srcset")]);
+          img.removeAttribute("srcset");
+          img.src = data;
+          if (img.decode) await img.decode().catch(() => {});
+        } catch (err) { console.warn("Screenshot: não consegui embutir a imagem " + (img.getAttribute("src") || ""), err); }
+      }));
+      console.info("Screenshot (rápido): " + swapped.length + "/" + imgs.length + " imagens embutidas");
+    } catch (_) {}
+    try {
+      const fontCSS = await getShotFontCSS();
+      for (const sc of computeShotScales()) {
+        try {
+          await new Promise((r) => setTimeout(r, 0));   // devolve o controle ao navegador (a tela respira entre tentativas)
+          const b = await htmlToImage.toBlob(document.body, {
+            pixelRatio: sc, backgroundColor: "#09090d", cacheBust: false, filter: shotFilter,
+            fontEmbedCSS: fontCSS || undefined
+          });
+          if (b && b.size > 2000) return b;
+        } catch (err) { console.warn("Screenshot (html-to-image) falhou em escala " + sc + ":", err); }
+      }
+      return null;
+    } finally {
+      st.remove();
+      swapped.forEach(([img, raw, srcset]) => { img.src = raw; if (srcset) img.setAttribute("srcset", srcset); });
+    }
+  };
+  // Aquece o que dá para preparar antes do clique (biblioteca + CSS das fontes), para o print sair sem espera
+  const warmShot = () => {
+    const go = async () => {
+      try {
+        if (typeof htmlToImage === "undefined") await loadScript(HTI_SRC);
+        if (!shotFontCSS && typeof htmlToImage !== "undefined") await getShotFontCSS();
+      } catch (_) { /* tenta de novo no clique */ }
+    };
+    if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 4000 }); else setTimeout(go, 2500);
+  };
+  if (screenshotBtn && location.protocol !== "file:") warmShot();
   if (screenshotBtn) {
     screenshotBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (shotBusy) return;
+      shotBusy = true;
+      screenshotBtn.classList.remove("is-clicked");
+      void screenshotBtn.offsetWidth;                 // reinicia a animação da linha
+      screenshotBtn.classList.add("is-clicked", "is-busy");
+      // Clipboard: o ClipboardItem é criado AGORA (dentro do gesto do clique) com uma Promise do PNG. Antes a
+      // gravação só era tentada depois da captura (vários segundos); o Brave/Chrome já tinham expirado o gesto
+      // do usuário e negavam a cópia. Se a cópia não for possível, cai no download como antes.
+      let resolveBlob, rejectBlob, clipPromise = null;
+      const blobPromise = new Promise((res, rej) => { resolveBlob = res; rejectBlob = rej; });
+      blobPromise.catch(() => {});
       try {
-        // Use html2canvas loaded from CDN (injected below if not present)
+        if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== "undefined") {
+          clipPromise = navigator.clipboard.write([new ClipboardItem({ "image/png": blobPromise })]);
+          clipPromise.catch(() => {});
+        }
+      } catch (_) { clipPromise = null; }
+      try {
+        // Feedback imediato (flash), sem aviso de espera; o flash não entra no print
+        const flash = document.createElement("div");
+        flash.className = "screenshot-flash";
+        flash.setAttribute("data-html2canvas-ignore", "");
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 500);
+        // Dois frames + um tick: o botão/flash pintam ANTES do trabalho pesado, então a tela não "congela" no clique
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 0))));
+
+        let blob = null;
+        let simplified = false;
+        let lastErr = null;
+        let shotMissing = 0;   // imagens que ficaram de fora do print (plano B em file:// sem js/class-icons.js)
+        // Em file:// o navegador bloqueia a leitura de imagens/CSS: o método rápido falharia sempre (e só gastaria
+        // tempo), então vai direto para o plano B (versão sem imagens).
+        if (location.protocol !== "file:") {
+          try { blob = await captureFast(); } catch (err) { lastErr = err; console.warn("Screenshot rápido falhou:", err); }
+        }
+
+        if (!blob) {
+        // Plano B: html2canvas (mais lento)
+        console.info("Screenshot: usando o plano B (html2canvas)" + (DNO_IS_FILE ? " — site aberto por file://" : "") +
+          "");
         if (typeof html2canvas === "undefined") {
           await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
         }
@@ -2740,33 +3013,121 @@ document.addEventListener("DOMContentLoaded", () => {
         // Opções comuns. allowTaint fica desligado; vídeos (iframe) e elementos marcados com
         // data-html2canvas-ignore não entram na captura.
         const baseOptions = {
-          backgroundColor: "#0c0908",
-          scale: 1,
+          backgroundColor: "#09090d",
           useCORS: true,
           allowTaint: false,
           logging: false,
-          ignoreElements: (el) =>
-            el.tagName === "IFRAME" || (el.hasAttribute && el.hasAttribute("data-html2canvas-ignore"))
+          ignoreElements: (el) => shotSkip(el)
         };
 
-        // Versão normal: só tira da cópia as imagens de outro domínio.
+        // Qualidade 1080p: a captura sai com largura alvo de 1920 px (leve e rápida). Se a captura falhar ou sair
+        // vazia, tenta de novo com escala 1.
+        const bodyW = Math.max(document.body.scrollWidth, document.documentElement.clientWidth) || 1;
+        const bodyH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) || 1;
+        // Plano B (html2canvas) também em 1080p (largura 1920 px), igual ao método rápido.
+        let target = SHOT_TARGET_W / bodyW;
+        target = Math.max(1, Math.min(target, 3, Math.sqrt(SHOT_MAX_PIXELS / (bodyW * bodyH))));
+        const scales = [target];
+        if (target > 1.5) scales.push(1.5);
+        if (target > 1) scales.push(1);
+        let shotScale = target;
+
+        // html2canvas não entende 3D (rotateY / backface-visibility) e desenharia as duas faces da coluna de
+        // conteúdo (Class Content e Event Content) sobrepostas e espelhadas. Na cópia usada para a captura o
+        // giro é desfeito e só a face que está visível na tela é mantida.
+        const flattenFlip = (doc) => {
+          const eventsView = doc.documentElement.classList.contains("events-view");
+          const st = doc.createElement("style");
+          st.textContent =
+            ".content-flip{perspective:none!important}" +
+            ".content-flip-inner{transform:none!important;transition:none!important;transform-style:flat!important;will-change:auto!important}" +
+            ".content-face{backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+            ".content-face-back{transform:none!important}" +
+            // html2canvas não sabe desenhar box-shadow com blur: a sombra neon do ícone de classe vira um bloco roxo
+            // sólido e deslocado (o "borrão roxo"). Na cópia o ícone fica com borda neon simples, sem sombra.
+            ".class-cell-wrapper{box-shadow:none!important;border:1px solid rgba(184,129,252,.8)!important;will-change:auto!important;backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+            ".btn-gear-mini,.btn-add-content-mini,.btn-remove-row,.gear-bubble,.class-nickname{will-change:auto!important;backface-visibility:visible!important;-webkit-backface-visibility:visible!important}" +
+            "*,*::before,*::after{animation:none!important;transition:none!important}" +
+            (eventsView ? ".content-face-front{visibility:hidden!important}" : ".content-face-back{visibility:hidden!important}");
+          doc.head.appendChild(st);
+        };
+
+        // Imagens do próprio site (ícones de classe, skills...) viram data URL na cópia: assim entram na captura
+        // sem depender de CORS nem "contaminar" o canvas. Imagens de outro domínio são retiradas.
+        // Em file:// o navegador não deixa ler nenhum arquivo local. Para os ícones de classe saírem mesmo assim,
+        // usa o mapa js/class-icons.js (opcional) com os PNGs já em data URL.
+        const inlineImages = async (doc) => {
+          const iconMap = window.DNO_CLASS_ICONS || null;
+          const imgs = Array.from(doc.querySelectorAll("img"));
+          await Promise.all(imgs.map(async (img) => {
+            let href = "";
+            try {
+              const u = new URL(img.getAttribute("src") || "", location.href);
+              if (u.protocol === "data:" || u.protocol === "blob:") return;
+              const mm = /\/img\/classes\/([^\/?#]+)\.png$/i.exec(u.pathname);
+              if (mm && iconMap) {
+                const data = lookupClassIcon(iconMap, decodeURIComponent(mm[1]));
+                if (data) { img.removeAttribute("srcset"); img.src = data; return; }
+                console.warn("Screenshot: ícone sem entrada em js/class-icons.js: " + decodeURIComponent(mm[1]));
+              }
+              if (u.protocol === "file:") { shotMissing++; img.remove(); return; }   // qualquer outra imagem local contaminaria o canvas
+              if (u.origin !== location.origin) { img.remove(); return; }
+              href = u.href;
+              let p = shotImgCache.get(href);
+              if (!p) {
+                p = fetch(href).then((r) => {
+                  if (!r.ok) throw new Error("HTTP " + r.status);
+                  return r.blob();
+                }).then((bl) => new Promise((res, rej) => {
+                  const fr = new FileReader();
+                  fr.onload = () => res(fr.result);
+                  fr.onerror = () => rej(fr.error);
+                  fr.readAsDataURL(bl);
+                }));
+                shotImgCache.set(href, p);
+              }
+              const data = await p;
+              img.removeAttribute("srcset");
+              img.src = data;
+            } catch (_) {
+              if (href) shotImgCache.delete(href);   // mantém o src original nesse caso
+            }
+          }));
+        };
+
+        // Backgrounds/máscaras com url(...) (imagens de CSS) saem da cópia: em file:// contaminariam o canvas.
+        const stripUrlBackgrounds = (doc) => {
+          const win = doc.defaultView;
+          doc.querySelectorAll("*").forEach((el) => {
+            try {
+              const cs = win.getComputedStyle(el);
+              ["backgroundImage", "listStyleImage", "borderImageSource", "webkitMaskImage"].forEach((prop) => {
+                const v = cs[prop];
+                if (v && v.indexOf("url(") !== -1) {
+                  const cssName = prop.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
+                  el.style.setProperty(cssName, "none", "important");
+                }
+              });
+            } catch (_) {}
+          });
+        };
+
+        // Versão normal: mantém as imagens do site (embutidas) e tira só as de outro domínio.
         const renderNormal = () => html2canvas(document.body, {
-          ...baseOptions,
-          onclone: (doc) => {
-            doc.querySelectorAll("img").forEach((img) => {
-              try {
-                const u = new URL(img.src, location.href);
-                if (u.protocol !== "data:" && u.protocol !== "blob:" && u.origin !== location.origin) img.remove();
-              } catch (_) {}
-            });
+          ...baseOptions, scale: shotScale,
+          onclone: async (doc) => {
+            flattenFlip(doc);
+            await inlineImages(doc);
+            if (DNO_IS_FILE) stripUrlBackgrounds(doc);
           }
         });
 
         // Versão simplificada: sem nenhuma imagem (img, svg, canvas, vídeo e backgrounds com url()).
         // Nenhuma imagem = nenhuma chance de "contaminar" o canvas; só o texto e as cores da tela saem.
         const renderSimple = () => html2canvas(document.body, {
-          ...baseOptions,
+          ...baseOptions, scale: shotScale,
           onclone: (doc) => {
+            flattenFlip(doc);
             doc.querySelectorAll("img, svg, canvas, video, iframe").forEach((el) => el.remove());
             const win = doc.defaultView;
             doc.querySelectorAll("*").forEach((el) => {
@@ -2789,38 +3150,44 @@ document.addEventListener("DOMContentLoaded", () => {
           try { cv.getContext("2d").getImageData(0, 0, 1, 1); return false; } catch (_) { return true; }
         };
 
-        // Aberta como arquivo local (file://), o navegador trata TODA imagem como de outra origem e
-        // contamina o canvas: nesse caso já vai direto para a versão simplificada.
-        let simplified = location.protocol === "file:";
+        // Em file:// qualquer imagem lida do disco contamina o canvas; por isso só entram os ícones embutidos
+        // (js/class-icons.js) e, se mesmo assim o canvas ficar contaminado, cai na versão simplificada.
+        simplified = false;
         let canvas = null;
-        if (!simplified) {
-          try { canvas = await renderNormal(); } catch (_) { canvas = null; }
-          if (!canvas || isTainted(canvas)) { canvas = null; simplified = true; }
-        }
-        if (!canvas) canvas = await renderSimple();
-
-        // Flash effect
-        const flash = document.createElement("div");
-        flash.className = "screenshot-flash";
-        document.body.appendChild(flash);
-        setTimeout(() => flash.remove(), 500);
-
-        const blob = await new Promise((resolve, reject) => {
+        for (const sc of scales) {
+          shotScale = sc;
+          canvas = null; blob = null;
+          simplified = false;
           try {
-            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob vazio"))), "image/png");
-          } catch (err) { reject(err); }
-        });
+            if (!simplified) {
+              try { canvas = await renderNormal(); }
+              catch (err) { canvas = null; lastErr = err; console.warn("Screenshot (normal) falhou em escala " + sc + ":", err); }
+              if (canvas && isTainted(canvas)) { canvas = null; console.warn("Screenshot (normal): canvas contaminado"); }
+              if (!canvas) simplified = true;
+            }
+            if (!canvas) canvas = await renderSimple();
+            if (!canvas || !canvas.width || !canvas.height) continue;
+            blob = await new Promise((resolve) => {
+              try { canvas.toBlob((b) => resolve(b), "image/png"); } catch (_) { resolve(null); }
+            });
+            if (blob) break;
+          } catch (err) { lastErr = err; }
+        }
+        }   // fim do plano B
+        if (!blob) throw lastErr || new Error("toBlob vazio");
 
         // Try clipboard first, fallback to download
         let copied = false;
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-          copied = true;
-        } catch (_) {}
+        resolveBlob(blob);
+        if (clipPromise) { try { await clipPromise; copied = true; } catch (err) { console.warn("Screenshot: clipboard negado, vai baixar o arquivo", err); } }
 
-        const note = simplified ? i18n("toastNoImages", " (versão sem imagens — abra pelo site publicado para incluir os ícones)") : "";
+        let note = simplified ? i18n("toastNoImages", " (versão sem imagens — abra pelo site publicado para incluir os ícones)") : "";
+        if (!simplified && shotMissing > 0) {
+          note = " ⚠ " + shotMissing + " ícone(s) ficaram de fora: o navegador bloqueia imagens locais (file://). Abra pelo site publicado no Cloudflare.";
+          console.warn("Screenshot: " + shotMissing + " imagem(ns) local(is) removida(s) do print (file://). Use o site publicado.");
+        }
         if (copied) {
-          showToast(i18n("toastCopied", "📋 Screenshot copiado para a área de transferência!") + note);
+          showToast(i18n("toastCopied", "📋 Screenshot copiado para a área de transferência!") + note, note ? 9000 : 0);
         } else {
           // Fallback: download
           const url = URL.createObjectURL(blob);
@@ -2829,11 +3196,16 @@ document.addEventListener("DOMContentLoaded", () => {
           a.download = `dragon-nest-ccc-${new Date().toISOString().slice(0,10)}.png`;
           a.click();
           URL.revokeObjectURL(url);
-          showToast(i18n("toastSaved", "📥 Screenshot salvo como arquivo!") + note);
+          showToast(i18n("toastSaved", "📥 Screenshot salvo como arquivo!") + note, note ? 9000 : 0);
         }
       } catch (err) {
+        rejectBlob(err);
         showToast(i18n("toastError", "⚠️ Não foi possível capturar a tela: ") + (err && err.name ? err.name : "erro"));
         console.error("Screenshot error:", err);
+      } finally {
+        shotBusy = false;
+        screenshotBtn.classList.remove("is-busy");
+        setTimeout(() => screenshotBtn.classList.remove("is-clicked"), 600);
       }
     });
   }
@@ -2848,19 +3220,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function showToast(msg) {
+  function showToast(msg, ms) {
     const t = document.createElement("div");
     t.className = "screenshot-toast";
+    t.setAttribute("data-html2canvas-ignore", "");   // o aviso não aparece dentro do print
     t.textContent = msg;
     document.body.appendChild(t);
-    setTimeout(() => t.remove(), 2600);
+    setTimeout(() => t.remove(), ms || 2600);
+    return t;
   }
   window.showToast = showToast;
 
   // -------------------------------------------------------
   // FEATURE 6: Online user counter (real, shared between all visitors)
-  // Each open tab sends a heartbeat to a Netlify Function (/api/presence),
-  // which stores it in Netlify Blobs and answers with how many sessions
+  // Each open tab sends a heartbeat to a Cloudflare Worker (/api/presence),
+  // which stores it in Cloudflare D1 and answers with how many sessions
   // sent a heartbeat recently. If the function is unreachable (e.g. the file
   // is opened locally), it falls back to the old same-browser localStorage count.
   //
@@ -3069,40 +3443,297 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el) el.textContent = n;
   }
 
+  // -------------------------------------------------------
+  // Criador de Grupos — convite online
+  // Cada heartbeat leva o nome público desta pessoa (nickname da PRIMEIRA classe da
+  // tabela, coluna "Classe" — a mesma que vira characters[0] no backup) e traz de volta
+  // a lista de quem está online + os convites recebidos. O envio dos dados só acontece
+  // depois que a pessoa clica em "Aceitar".
+  // -------------------------------------------------------
+  const SHARE_URL = "/api/party-share";
+  let onlineUsers = [];      // [{ pub, name, classId }] — sem a própria pessoa
+  let onlineTotal = 0;       // total de sessões online segundo o servidor (inclui quem não tem classe na tabela)
+  let presenceLive = false;  // true = a function de presença respondeu no último heartbeat
+  let apiMissing = false;    // true = servidor sem as Functions (404/405), ex.: servidor estático simples
+  let hbCount = 0;
+  window.isLocalMode = () => DNO_IS_FILE || apiMissing;   // usado pelo Criador de Grupos para explicar por que não há convites
+
+  function getShareProfile() {
+    try {
+      const row = document.querySelector("#tablesWrapper tbody tr");
+      if (!row) return null;
+      const el = row.querySelector(".class-nickname");
+      const clsEl = el && el.querySelector(".class-nickname-class");
+      const name = ((el && (el.dataset.nickname || (clsEl && clsEl.textContent))) || "").trim();
+      const classId = row.dataset.classId || (el && el.dataset.classId) || "";
+      return name ? { name: name.slice(0, 30), classId } : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Versão enxuta do backup para compartilhar: só o que o Criador de Grupos usa
+  // (classe, nickname, gear e conteúdos feitos/pendentes). Number ID (account),
+  // eventos e presets ficam de fora.
+  function buildSharedPayload() {
+    const full = window.buildBackupData();
+    return {
+      savedAt: full.savedAt,
+      characters: (full.characters || []).map((c) => ({
+        classId: c.classId,
+        nickname: c.nickname,
+        gear: c.gear,
+        contents: (c.contents || []).map((x) => ({ title: x.title, done: !!x.done }))
+      }))
+    };
+  }
+
+  const inviteCards = new Map();   // reqId -> elemento do aviso
+  const answeredInvites = new Set();
+
+  function ensureInviteHost() {
+    let host = document.getElementById("inviteHost");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "inviteHost";
+      host.className = "invite-host";
+      host.setAttribute("data-html2canvas-ignore", "");
+      document.body.appendChild(host);
+    }
+    return host;
+  }
+
+  function dropInviteCard(reqId) {
+    const card = inviteCards.get(reqId);
+    if (card) card.remove();
+    inviteCards.delete(reqId);
+  }
+
+  async function respondInvite(inv, accept, buttons) {
+    answeredInvites.add(inv.reqId);
+    buttons.forEach((b) => { b.disabled = true; });
+    try {
+      const payload = { action: "respond", id: SESSION_ID, reqId: inv.reqId, accept };
+      if (accept) {
+        if (typeof window.buildBackupData !== "function") throw new Error("no data");
+        payload.data = buildSharedPayload();
+      }
+      const res = await fetch(SHARE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok && res.status !== 404 && res.status !== 410) throw new Error("share " + res.status);
+      if (accept && res.ok) showToast(i18n("apSentToast", "📤 Dados enviados"));
+    } catch (_) {
+      answeredInvites.delete(inv.reqId);
+      buttons.forEach((b) => { b.disabled = false; });
+      showToast(i18n("apShareError", "⚠️ Não foi possível enviar seus dados"));
+      return;
+    }
+    dropInviteCard(inv.reqId);
+  }
+
+  function showInviteCard(inv) {
+    const card = document.createElement("div");
+    card.className = "invite-card";
+    card.setAttribute("role", "alertdialog");
+
+    const head = document.createElement("div");
+    head.className = "invite-head";
+    if (inv.fromClassId) {
+      const img = document.createElement("img");
+      img.src = "img/classes/" + encodeURIComponent(inv.fromClassId) + ".png";
+      img.alt = "";
+      img.onerror = () => { img.style.display = "none"; };
+      head.appendChild(img);
+    }
+    const text = document.createElement("div");
+    text.className = "invite-text";
+    const who = document.createElement("strong");
+    who.textContent = inv.fromName || "?";
+    const msg = document.createElement("span");
+    msg.textContent = " " + i18n("apInboundText", "quer importar os dados dos seus personagens para montar uma party.");
+    text.appendChild(who);
+    text.appendChild(msg);
+    head.appendChild(text);
+
+    const actions = document.createElement("div");
+    actions.className = "invite-actions";
+    const decline = document.createElement("button");
+    decline.type = "button";
+    decline.className = "invite-btn";
+    decline.textContent = i18n("apDecline", "Recusar");
+    const accept = document.createElement("button");
+    accept.type = "button";
+    accept.className = "invite-btn accept";
+    accept.textContent = i18n("apAccept", "Aceitar");
+    decline.addEventListener("click", () => respondInvite(inv, false, [accept, decline]));
+    accept.addEventListener("click", () => respondInvite(inv, true, [accept, decline]));
+    actions.appendChild(decline);
+    actions.appendChild(accept);
+
+    card.appendChild(head);
+    card.appendChild(actions);
+    ensureInviteHost().appendChild(card);
+    inviteCards.set(inv.reqId, card);
+  }
+
+  // "list" = convites pendentes que o servidor devolveu neste heartbeat.
+  function handleIncomingInvites(list) {
+    const ids = new Set(list.map((i) => i && i.reqId));
+    // convite cancelado/expirado/respondido em outro lugar → o aviso some sozinho
+    Array.from(inviteCards.keys()).forEach((reqId) => { if (!ids.has(reqId)) dropInviteCard(reqId); });
+    list.forEach((inv) => {
+      if (!inv || !inv.reqId || inviteCards.has(inv.reqId) || answeredInvites.has(inv.reqId)) return;
+      showInviteCard(inv);
+    });
+  }
+
+  // -------------------------------------------------------
+  // Conteúdo concluído pelo líder da party: o servidor entrega o aviso no heartbeat. Aqui o
+  // conteúdo é marcado como feito nos personagens indicados (mesmo clique do chip) e a pessoa
+  // recebe uma mensagem dizendo que o líder finalizou o conteúdo.
+  // -------------------------------------------------------
+  const appliedNotices = new Set();
+
+  // Marca o conteúdo como feito no personagem (classe + nickname) da tabela. Devolve o rótulo do
+  // conteúdo (no idioma atual) se o personagem e o chip existem, ou null.
+  function markContentDone(classId, nickname, title, strict) {
+    const rows = Array.from(document.querySelectorAll("#tablesWrapper tbody tr")).filter((r) => r.dataset.classId === classId);
+    if (!rows.length) return null;
+    let row = rows.find((r) => {
+      const el = r.querySelector(".class-nickname");
+      return el && (el.dataset.nickname || "") === nickname;
+    });
+    // strict = usado pelo líder na própria tela: só marca se classe + nickname baterem (não chuta)
+    if (!row && !strict && rows.length === 1) row = rows[0];
+    if (!row) return null;
+    const chip = Array.from(row.querySelectorAll(".content-chip")).find((c) => c.dataset.title === title);
+    if (!chip) return null;
+    if (!chip.classList.contains("done")) {
+      const st = chip.querySelector(".chip-status");
+      if (st) st.click();   // mesmo caminho do clique do usuário (ícone, Duel Dragon vinculado, etc.)
+    }
+    const lab = chip.querySelector(".chip-label");
+    return (lab && lab.textContent) || title;
+  }
+
+  // O Criador de Grupos (outro bloco) usa isto para marcar o conteúdo na tabela do próprio líder.
+  window.dnMarkContentDone = (classId, nickname, title) => markContentDone(String(classId || ""), String(nickname || ""), String(title || ""), true);
+
+  function showNoticeCard(text) {
+    const card = document.createElement("div");
+    card.className = "invite-card";
+    card.setAttribute("role", "alertdialog");
+    const head = document.createElement("div");
+    head.className = "invite-head";
+    const text_ = document.createElement("div");
+    text_.className = "invite-text";
+    text_.textContent = text;
+    head.appendChild(text_);
+    const actions = document.createElement("div");
+    actions.className = "invite-actions";
+    const ok = document.createElement("button");
+    ok.type = "button";
+    ok.className = "invite-btn accept";
+    ok.textContent = i18n("apOk", "OK");
+    ok.addEventListener("click", () => card.remove());
+    actions.appendChild(ok);
+    card.appendChild(head);
+    card.appendChild(actions);
+    ensureInviteHost().appendChild(card);
+  }
+
+  function handleIncomingNotices(list) {
+    list.forEach((n) => {
+      if (!n || !n.noticeId || appliedNotices.has(n.noticeId)) return;
+      appliedNotices.add(n.noticeId);
+      const done = [];
+      let label = "";
+      (Array.isArray(n.chars) ? n.chars : []).forEach((c) => {
+        const lab = markContentDone(String(c.classId || ""), String(c.nickname || ""), String(n.content || ""));
+        if (lab) { label = lab; done.push(c.nickname || c.classId); }
+      });
+      // confirma o recebimento (o servidor apaga o aviso); se falhar, o aviso volta e é ignorado pelo Set
+      fetch(SHARE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ack", id: SESSION_ID, noticeId: n.noticeId })
+      }).catch(() => {});
+      const leader = n.fromName || "?";
+      const what = label || n.content || "";
+      const who = done.length ? done.map((x) => "\"" + x + "\"").join(", ") : "";
+      showNoticeCard(
+        who
+          ? i18n("apLeaderDone", "👑 {leader}, líder da party, finalizou o conteúdo {content}. Marcado como concluído em: {chars}.")
+              .replace("{leader}", leader).replace("{content}", what).replace("{chars}", who)
+          : i18n("apLeaderDoneNoChar", "👑 {leader}, líder da party, finalizou o conteúdo {content}.")
+              .replace("{leader}", leader).replace("{content}", what)
+      );
+    });
+  }
+
   async function heartbeat() {
     touchOwnTab();
+    // Sem Functions (file:// ou servidor estático): não chama a API (ou chama só de vez em quando, para o caso de
+    // ela aparecer) e usa o contador local.
+    if (DNO_IS_FILE || (apiMissing && (hbCount++ % 6) !== 0)) {
+      showOnline(localCount());
+      lastRegions = null;
+      lastCountries = null;
+      presenceLive = false;
+      if (typeof window.refreshRegionPanel === "function") window.refreshRegionPanel();
+      window.dispatchEvent(new Event("dn:online-users"));
+      return;
+    }
     try {
       const res = await fetch(PRESENCE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // region/country não são mais enviados aqui: o backend agora calcula
         // isso sozinho a partir do IP real da requisição (context.geo da
-        // Netlify), então o que o navegador mandasse seria ignorado mesmo.
-        body: JSON.stringify({ id: SESSION_ID }),
+        // Cloudflare), então o que o navegador mandasse seria ignorado mesmo.
+        // name/classId = nickname e classe da 1ª linha da tabela (convite do Criador de Grupos).
+        body: JSON.stringify({ id: SESSION_ID, ...(getShareProfile() || {}) }),
         cache: "no-store"
       });
+      if (res.status === 404 || res.status === 405) apiMissing = true;
       if (!res.ok) throw new Error(`presence ${res.status}`);
       const data = await res.json();
       if (typeof data.count !== "number") throw new Error("bad response");
+      apiMissing = false;
       showOnline(data.count);
       lastRegions = (data.regions && typeof data.regions === "object") ? data.regions : null;
       lastCountries = (data.countries && typeof data.countries === "object") ? data.countries : null;
+      presenceLive = true;
+      onlineUsers = Array.isArray(data.users) ? data.users.filter((u) => u && u.pub && u.name) : [];
+      onlineTotal = data.count;
+      handleIncomingInvites(Array.isArray(data.invites) ? data.invites : []);
+      handleIncomingNotices(Array.isArray(data.notices) ? data.notices : []);
     } catch (_) {
       showOnline(localCount());
       lastRegions = null;
       lastCountries = null;
+      presenceLive = false; // mantém a última lista e os avisos abertos: falha de rede é passageira
     }
     if (typeof window.refreshRegionPanel === "function") window.refreshRegionPanel();
+    window.dispatchEvent(new Event("dn:online-users"));
   }
   window.getOnlineRegions = () => lastRegions || localRegions();
   window.getOnlineCountries = (region) => (lastCountries && lastCountries[region]) || localCountries(region);
   window.VISITOR_REGION = VISITOR_REGION;
   window.VISITOR_COUNTRY = VISITOR_COUNTRY;
+  window.getOnlineUsers = () => onlineUsers;
+  window.getOnlineTotal = () => onlineTotal;
+  window.isPresenceLive = () => presenceLive;
+  window.dnDeviceId = DEVICE_ID; // usado pelo Criador de Grupos para convidar/receber
 
   // Tell the server this session is gone (so the count drops right away) —
   // but only once every tab belonging to this device has closed.
   window.addEventListener("pagehide", () => {
     if (!isLastTabForDevice()) return;
+    if (DNO_IS_FILE || apiMissing) return;
     try {
       const blob = new Blob([JSON.stringify({ id: SESSION_ID, leave: true })], { type: "application/json" });
       navigator.sendBeacon(PRESENCE_URL, blob);
@@ -4477,6 +5108,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.getTotalCountries = (region) => (lastTotalCountries && lastTotalCountries[region]) || localTotalCountries(region);
 
   async function loadServerStats() {
+    if (DNO_IS_FILE) return false;   // sem Functions em file://: usa os números locais
     try {
       const res = await fetch("/api/presence", { method: "GET", cache: "no-store" });
       if (!res.ok) throw new Error(`stats ${res.status}`);
@@ -4538,10 +5170,18 @@ document.addEventListener("DOMContentLoaded", () => {
   let lastSavedHash = null;
   let fileHandle = null; // FileSystemFileHandle cached in memory once obtained/loaded
 
+  // true = o auto-save está ligado mas o navegador ainda não liberou a escrita no arquivo (acontece sempre que a
+  // página é reaberta: a permissão do arquivo expira). Até um clique do usuário liberar, NADA é gravado.
+  let needsReconnect = false;
+  let reconnectAsking = false;
+
   function updateBtnState() {
     btn.setAttribute("aria-pressed", String(autoSaveEnabled));
     const label = btn.querySelector(".autosave-label");
-    if (autoSaveEnabled) {
+    if (autoSaveEnabled && needsReconnect) {
+      btn.title = "Auto-save: aguardando permissão — clique em qualquer lugar da página e permita a edição do arquivo";
+      if (label) label.textContent = "Auto ⚠";
+    } else if (autoSaveEnabled) {
       btn.title = supportsFsAccess
         ? "Auto-save: ativado — salva no arquivo escolhido a cada mudança"
         : "Auto-save: ativado — salva na pasta Downloads a cada mudança";
@@ -4677,33 +5317,67 @@ document.addEventListener("DOMContentLoaded", () => {
     URL.revokeObjectURL(url);
   }
 
+  let saving = false;      // trava: nunca dois saves gravando ao mesmo tempo
+  let savePending = false; // mudou enquanto gravava: roda de novo no fim
+
   async function autoSave() {
     if (!autoSaveEnabled) return;
-    const data = gatherExportData();
+    if (saving) { savePending = true; return; }
+    saving = true;
+    try {
+      await autoSaveOnce();
+    } finally {
+      saving = false;
+      if (savePending) { savePending = false; scheduleAutoSave(); }
+    }
+  }
+
+  async function autoSaveOnce() {
+    let data;
+    try {
+      data = typeof window.buildBackupData === "function" ? window.buildBackupData() : gatherExportData();
+    } catch (_) {
+      data = gatherExportData();
+    }
+    // A tabela não é guardada no navegador: ao abrir a página ela começa vazia. Sem esta trava, o primeiro
+    // auto-save gravava "0 personagens" POR CIMA do backup real (arquivo de ~1 KB). Tabela vazia nunca é gravada.
+    if (!data.characters || data.characters.length === 0) return;
     const jsonStr = JSON.stringify(data, null, 2);
 
     // Avoid redundant saves: skip if content hasn't changed since last save.
-    if (jsonStr === lastSavedHash) return;
+    const hashStr = JSON.stringify(Object.assign({}, data, { savedAt: 0 }));
+    if (hashStr === lastSavedHash) return;
 
     // Sem suporte à File System Access API: único caso em que o fallback de
     // download avulso faz sentido, pois não há como sobrescrever um arquivo
     // específico de jeito nenhum neste navegador.
     if (!supportsFsAccess) {
       legacyDownloadSave(jsonStr);
-      lastSavedHash = jsonStr;
+      lastSavedHash = hashStr;
       flashBtn();
       return;
     }
 
     const handle = await getStoredHandle();
+    if (handle && !(await hasPermission(handle))) {
+      // Permissão expirou (página reaberta): o navegador só deixa pedir de novo com um clique do usuário.
+      if (!needsReconnect) {
+        needsReconnect = true;
+        updateBtnState();
+        if (window.showToast) window.showToast("⚠️ Auto-save pausado: clique em qualquer lugar e permita a edição do arquivo para voltar a salvar");
+      }
+      return;
+    }
     if (handle && (await hasPermission(handle))) {
+      if (needsReconnect) { needsReconnect = false; updateBtnState(); }
       try {
         const writable = await handle.createWritable();
         await writable.write(jsonStr);
         await writable.close();
-        lastSavedHash = jsonStr;
+        lastSavedHash = hashStr;
         flashBtn();
-      } catch (_) {
+      } catch (err) {
+        console.error("Auto-save: falha ao gravar", err);
         // A escrita no arquivo/pasta escolhido falhou (arquivo movido/apagado,
         // permissão perdida, etc). Antes, esse erro caía no download avulso —
         // que salva sempre na pasta Downloads padrão com um novo nome
@@ -4736,11 +5410,65 @@ document.addEventListener("DOMContentLoaded", () => {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["class", "data-gear", "data-account"]
+    characterData: true,
+    attributeFilter: ["class", "data-gear", "data-account", "data-nickname", "data-class-id"]
   });
+
+  // O arquivo importado vira o destino do Auto-save (um único arquivo: o que você importou).
+  window.addEventListener("dn:import-handle", async (ev) => {
+    const d = ev.detail || {};
+    if (!d.handle) return;
+    fileHandle = d.handle;
+    await saveHandleToDB(d.handle);
+    lastSavedHash = null;
+    needsReconnect = autoSaveEnabled && !(await hasPermission(d.handle));
+    updateBtnState();
+    if (window.showToast) {
+      window.showToast(autoSaveEnabled
+        ? "Auto-save vinculado ao arquivo importado: " + (d.name || "")
+        : "Arquivo importado: ao ligar o Auto, ele será atualizado automaticamente");
+    }
+    if (autoSaveEnabled) scheduleAutoSave();
+  });
+
+  // Reconexão: qualquer clique (gesto do usuário) pede a permissão de volta e grava o que ficou pendente.
+  async function tryReconnect() {
+    if (!autoSaveEnabled || !needsReconnect || reconnectAsking || !supportsFsAccess) return;
+    const handle = await getStoredHandle();
+    if (!handle) return;
+    reconnectAsking = true;
+    try {
+      const ok = await verifyPermissionWithPrompt(handle);
+      if (ok) {
+        needsReconnect = false;
+        lastSavedHash = null;
+        updateBtnState();
+        if (window.showToast) window.showToast("Auto-save reconectado");
+        scheduleAutoSave();
+      }
+    } finally {
+      reconnectAsking = false;
+    }
+  }
+  document.addEventListener("click", tryReconnect, true);
+  document.addEventListener("keydown", tryReconnect, true);
+
+  // Ao abrir a página já com o auto-save ligado, confere a permissão logo de cara para avisar.
+  if (autoSaveEnabled && supportsFsAccess) {
+    getStoredHandle().then(async (h) => {
+      if (!h) { needsReconnect = false; return; }
+      if (!(await hasPermission(h))) {
+        needsReconnect = true;
+        updateBtnState();
+        if (window.showToast) window.showToast("⚠️ Auto-save pausado: clique em qualquer lugar e permita a edição do arquivo");
+      }
+    });
+  }
 
   btn.addEventListener("click", async (e) => {
     e.stopPropagation();
+    // Ligado mas sem permissão (página reaberta): o clique no botão reconecta em vez de desligar.
+    if (autoSaveEnabled && needsReconnect) { await tryReconnect(); return; }
     const turningOn = !autoSaveEnabled;
 
     // Sem a File System Access API (ex.: Firefox) não há como sobrescrever um
@@ -4750,6 +5478,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // vez. Em vez de repetir esse comportamento quebrado, avisamos e não
     // ativamos — o botão "Exportar" continua disponível para salvar na hora.
     if (turningOn && !supportsFsAccess) {
+      // Brave desliga a File System Access API por padrão (é ela que permite gravar sempre no mesmo arquivo).
+      const isBrave = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
+      if (isBrave && window.showToast) {
+        window.showToast(
+          "Brave: o Auto-save precisa da API de arquivos, que vem desligada. Abra brave://flags/#file-system-access-api, " +
+          "mude para Enabled, reinicie o Brave e ative o Auto de novo. Enquanto isso, use Exportar.", 14000
+        );
+        return;
+      }
       if (window.showToast) {
         window.showToast(
           "Auto-save em arquivo único não é suportado neste navegador. Use Chrome/Edge, ou clique em Exportar para salvar manualmente."
@@ -4828,58 +5565,67 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // =========================================================
-// GRUPO AUTOMÁTICO / AUTOMATIC PARTY (menu lateral)
-// Recebe até 8 backups (.json, um por jogador), o tipo de party (2/4/6/8) e um conteúdo
-// da lista do "+" e monta a melhor composição usando, de cada arquivo, UM personagem que
-// ainda NÃO concluiu esse conteúdo (chip do conteúdo presente e não marcado como feito).
+// CRIADOR DE GRUPOS / PARTY MAKER (menu lateral)
+// Recebe 2/4/6/8 backups (.json, um por jogador), o tipo de party e um conteúdo da lista do "+"
+// e monta a melhor composição usando, de cada arquivo, UM personagem que ainda NÃO concluiu
+// esse conteúdo. Botão "Conteúdo concluído" marca os personagens escolhidos como feitos nos
+// arquivos (permite gerar a próxima party) e o histórico guarda composição + status.
 // =========================================================
 (function () {
   "use strict";
 
   /* AP-LOGIC-START */
+  // ---------------------------------------------------------------- DADOS
   const AP_ELEMENTS = {
     light: ["crusader", "inquisitor", "lightfury", "valkyrie", "ilumia", "guardian", "saint"],
     fire:  ["adept", "saleana", "darkavenger", "guardian", "crusader", "saint", "souleater", "ripper"],
     dark:  ["raven", "abysswalker", "darksummoner", "obscuria", "lightfury", "physician"],
     ice:   ["glaciana", "adept", "guardian", "crusader", "saint"]
   };
-  // Papéis de cada classe (DPS, SubDPS, Support, Tank, Healer, SubHealer).
-  const AP_ROLES = {
-    crusader: ["DPS", "Tank"], inquisitor: ["SubDPS"], lightfury: ["Support", "Healer"], valkyrie: ["SubDPS"],
-    ilumia: ["SubDPS"], guardian: ["Support", "Tank"], saint: ["Support", "Healer"],
-    adept: ["DPS"], saleana: ["DPS"], darkavenger: ["DPS"], souleater: ["Support"], ripper: ["SubDPS"],
-    raven: ["DPS"], abysswalker: ["SubDPS", "SubHealer"], darksummoner: ["Support"], obscuria: ["SubDPS"],
-    physician: ["Support", "Healer"], glaciana: ["Support"],
-    barbarian: ["DPS"], moonlord: ["DPS"], gladiator: ["DPS"], ruina: ["DPS"], defensio: ["SubDPS", "Tank"],
-    sentinel: ["DPS"], sniper: ["DPS"], shootingstar: ["DPS"], gearmaster: ["DPS"],
-    silverhunter: ["DPS"], // Silver Hunter não está nas listas da regra: tratado como DPS neutro
-    destroyer: ["Support", "Tank"],
-    tempest: ["SubDPS"], windwalker: ["SubDPS"], spiritdancer: ["SubDPS"], bladedancer: ["SubDPS"], flurry: ["SubDPS"]
-  };
-  const AP_NEUTRAL = ["barbarian", "moonlord", "gladiator", "ruina", "defensio", "sentinel", "sniper", "shootingstar", "gearmaster", "silverhunter",
-                      "destroyer", "tempest", "windwalker", "spiritdancer", "bladedancer", "flurry"];
+  const AP_ELEMENT_KEYS = ["light", "fire", "dark", "ice"];
+  // Neutros. Silver Hunter não consta na regra: tratado como DPS neutro.
+  const AP_NEUTRAL_DPS = ["barbarian", "moonlord", "gladiator", "ruina", "defensio", "sentinel", "sniper", "shootingstar", "gearmaster", "silverhunter"];
+  const AP_NEUTRAL_TANK = ["destroyer"];
+  const AP_NEUTRAL_SUPPORT = ["tempest", "windwalker", "spiritdancer", "bladedancer", "flurry"];
+  const AP_NEUTRAL = AP_NEUTRAL_DPS.concat(AP_NEUTRAL_TANK, AP_NEUTRAL_SUPPORT);
+  // Regra de elemento: em party de FOGO, neutros só entram como SUPORTE (Destroyer conta como Support-Tank).
+  // Em Light, Dark e Ice, qualquer neutro (suporte, subdps ou dps) pode ser usado.
+  const AP_FIRE_NEUTRAL_OK = AP_NEUTRAL_SUPPORT.concat(AP_NEUTRAL_TANK);
+
+  // Papéis (conforme a lista de classes das regras)
+  const AP_DPS = ["adept", "saleana", "darkavenger", "raven", "crusader", "barbarian", "moonlord", "gladiator", "ruina",
+                  "sentinel", "sniper", "shootingstar", "gearmaster", "silverhunter"];
+  const AP_SUBDPS = ["inquisitor", "valkyrie", "ilumia", "ripper", "abysswalker", "obscuria", "defensio",
+                     "tempest", "windwalker", "spiritdancer", "bladedancer", "flurry"];
+  const AP_SUPPORT = ["lightfury", "saint", "physician", "guardian", "souleater", "darksummoner", "glaciana", "destroyer"];
   const AP_HEALERS = ["lightfury", "physician", "saint"];
   const AP_SUBHEALERS = ["abysswalker"];
   const AP_TANKS = ["guardian", "crusader", "destroyer", "defensio"];
-  const AP_CD_PRIORITY = ["ilumia", "obscuria", "souleater", "physician", "adept"]; // redução de cooldown, mais prioritário primeiro
-  const AP_CD_CLASSES = AP_CD_PRIORITY.concat(["tempest", "windwalker"]);
-  const AP_CD_DEPENDENTS = ["sentinel", "gearmaster", "moonlord"];
-  const AP_BURST_CLASSES = ["souleater", "spiritdancer", "bladedancer", "darksummoner", "physician", "adept"]; // burst de atributo base (STR/INT)
-  const AP_BURST_DEPENDENTS = ["barbarian", "moonlord", "sniper", "crusader"];
-  const AP_CARRY_ROLES = ["DPS"]; // papéis que contam como carry (acrescente "SubDPS" para incluir os SubDPS)
-  const AP_ICE_GUESTS = ["glaciana", "saint"]; // únicas do Ice que entram em party de outro elemento (1 vaga de suporte)
-  const AP_ELEMENT_KEYS = ["light", "fire", "dark", "ice"];
-  const AP_BEAM = 2500;
+  const AP_PURE_TANKS = ["guardian", "destroyer"];      // Support-Tank: não servem de tank na party de 6
+  const AP_HYBRID_TANKS = ["crusader", "defensio"];     // DPS-Tank / SubDPS-Tank
+  // Carry = DPS (fora tanks) + SubDPS ofensivos. Healers, suportes, tanks e SubDPS de cooldown/burst não contam.
+  const AP_CARRY = ["adept", "saleana", "darkavenger", "raven", "barbarian", "moonlord", "gladiator", "ruina",
+                    "sentinel", "sniper", "shootingstar", "gearmaster", "silverhunter", "inquisitor", "valkyrie", "ripper"];
+  // Redução de recarga — ordem de prioridade (tempest/windwalker são cooldown, mas ficam depois)
+  const AP_CD_PRIORITY = ["ilumia", "obscuria", "souleater", "physician", "adept", "tempest", "windwalker"];
+  const AP_BURST = ["souleater", "spiritdancer", "bladedancer", "darksummoner", "physician", "adept"]; // buff de STR/INT
+  const AP_NEEDS_CD = ["sentinel", "gearmaster", "moonlord"];
+  const AP_NEEDS_BURST = ["barbarian", "moonlord", "sniper", "crusader"];
+  const AP_ICE_GUESTS = ["glaciana", "saint"];          // únicas do Ice que entram em party de outro elemento
+  // Suportes de outro elemento (não-Ice) que podem completar a party: "completar com supports e neutros".
+  // Só SUPORTES entram aqui. Ilumia (Light) e Obscuria (Dark) são SubDPS: ter redução de recarga não os torna
+  // suporte, e antes isso deixava uma Obscuria cair numa party de Fogo. Fora do elemento, só no modo relaxado.
+  const AP_FOREIGN_OK = ["lightfury", "physician", "souleater", "darksummoner"];
+  const AP_SUPPORT_SLOT = ["souleater", "darksummoner", "glaciana"]; // "vaga de 1 suporte" quando há convidado Ice
+  const AP_BEAM = 1200;
   const AP_RANK = { Epic: 1, Unique: 2, Legend: 3 };
 
-  const apRoles = (id) => AP_ROLES[id] || [];
   const apElementsOf = (id) => AP_ELEMENT_KEYS.filter((e) => AP_ELEMENTS[e].includes(id));
-  const apKnown = (id) => !!AP_ROLES[id] && (AP_NEUTRAL.includes(id) || apElementsOf(id).length > 0);
-  const apFits = (id, E) => AP_NEUTRAL.includes(id) || AP_ELEMENTS[E].includes(id);
-  const apIceGuest = (id, E) => E !== "ice" && AP_ICE_GUESTS.includes(id) && !apFits(id, E);
-  const apCarryCapable = (id) => apRoles(id).some((r) => AP_CARRY_ROLES.includes(r));
+  const apKnown = (id) => AP_NEUTRAL.includes(id) || apElementsOf(id).length > 0;
+  const apNeutralAllowed = (id, E) => E !== "fire" || AP_FIRE_NEUTRAL_OK.includes(id);
+  const apFits = (id, E) => (AP_NEUTRAL.includes(id) && apNeutralAllowed(id, E)) || AP_ELEMENTS[E].includes(id);
+  const apIsNeutral = (id) => AP_NEUTRAL.includes(id);
 
-  // { rarity, text: "Unique 90 +7" } → valor numérico + dados de exibição
   function apParseGear(g) {
     if (!g || typeof g !== "object") return { rank: 0, level: 0, enh: 0, text: "" };
     const text = String(g.text || "");
@@ -4887,126 +5633,241 @@ document.addEventListener("DOMContentLoaded", () => {
     const m = /(\d+)\s*\+(\d+)/.exec(text);
     return { rank: AP_RANK[rarity] || 0, level: m ? Number(m[1]) : 0, enh: m ? Number(m[2]) : 0, text };
   }
-  const apGearValue = (p) => (p.rank ? p.rank * 10 + (p.level >= 90 ? 3 : 0) + p.enh * 0.15 : 0);
+  // Hierarquia: Legend 90 > Legend 80 > Unique 90 > Epic 90 > Unique 80 > Epic 80 (rank → nível → posição)
+  const AP_TIER = { 3: { 90: 6, 80: 5 }, 2: { 90: 4, 80: 2 }, 1: { 90: 3, 80: 1 } };
+  const apGearTier = (p) => (p.rank && AP_TIER[p.rank] ? AP_TIER[p.rank][p.level >= 90 ? 90 : 80] : 0);
+  const apGearValue = (p) => (p.rank ? apGearTier(p) * 10 + p.enh * 0.15 : 0);   // +enh (máx. ~2) só desempata dentro do mesmo degrau
+
+  // Faixa de carries por tamanho de party [mín, máx]. Party de 2 não tem regra de carry.
+  const AP_CARRY_RANGE = { 4: [1, 2], 6: [3, 4], 8: [4, 8] };
 
   // Melhor personagem PENDENTE (conteúdo presente e não concluído) de cada classe de um backup.
-  function apCandidates(data, contentTitle) {
+  function apCandidates(data, contentTitle, skip) {
     const best = new Map();
-    ((data && data.characters) || []).forEach((ch) => {
+    const alt = new Map();
+    ((data && data.characters) || []).forEach((ch, idx) => {
       if (!ch || !apKnown(ch.classId)) return;
-      const entry = (ch.contents || []).find((c) => c && c.title === contentTitle);
-      if (!entry || entry.done) return;
+      const ei = (ch.contents || []).findIndex((c) => c && c.title === contentTitle);
+      if (ei < 0 || ch.contents[ei].done || (skip && skip(ch))) return;
       const set = apParseGear(ch.gear && ch.gear.set);
       const wp = apParseGear(ch.gear && ch.gear.weapon);
       const cand = {
-        classId: ch.classId, nick: ch.nickname || "", setText: set.text, weaponText: wp.text,
-        setRank: set.rank, val: apGearValue(set) + apGearValue(wp) * 0.5,
-        carry: set.rank >= 2 && apCarryCapable(ch.classId)
+        classId: ch.classId, nick: ch.nickname || "", idx, ei,
+        setText: set.text, weaponText: wp.text, setRank: set.rank,
+        val: apGearValue(set) + apGearValue(wp) * 0.5,
+        carry: set.rank >= 2 && AP_CARRY.includes(ch.classId)
       };
       const cur = best.get(ch.classId);
       if (!cur || cand.val > cur.val) best.set(ch.classId, cand);
+      // Alternativa sem status de carry (set Epic) da mesma classe: permite respeitar o teto de carries da party
+      if (AP_CARRY.includes(ch.classId) && !cand.carry) {
+        const curNc = alt.get(ch.classId);
+        if (!curNc || cand.val > curNc.val) alt.set(ch.classId, cand);
+      }
     });
+    alt.forEach((cand, id) => { const b = best.get(id); if (b && b.carry) best.set(id + "#nc", cand); });
     return Array.from(best.values());
   }
 
-  // final=false: usado para podar o beam (sem as penalidades de dependência, que só fazem
-  // sentido com a party completa). final=true: pontuação definitiva da party inteira.
-  // ctx.healerAvail: algum arquivo tem healer (Lightfury/Physician/Saint) pendente neste conteúdo.
+  // O que existe nos arquivos (para as regras de prioridade de healer)
+  function apContext(files) {
+    const all = [].concat(...files);
+    const nativeHealer = {};
+    AP_ELEMENT_KEYS.forEach((E) => {
+      nativeHealer[E] = all.some((c) => AP_HEALERS.includes(c.classId) && AP_ELEMENTS[E].includes(c.classId));
+    });
+    return { trueHealer: all.some((c) => AP_HEALERS.includes(c.classId)), nativeHealer };
+  }
+
+  // Alvo de classes do elemento: 2 → 1 | 4 → 2 | 6/8 → 4 (ideal 5–6)
+  const apMinElement = (N) => (N >= 6 ? 4 : N >= 4 ? 2 : 1);
+
   function apEvaluate(ms, E, N, ctx, final) {
-    const need = N >= 4 ? Math.ceil(N / 2) : 0;
-    const minE = N >= 4 ? 2 : 1;
-    const hasTrue = ms.some((m) => AP_HEALERS.includes(m.classId));
-    // SubHealer só assume a vaga de healer se NENHUM arquivo tem healer disponível.
-    const designated = (!hasTrue && !ctx.healerAvail) ? (ms.find((m) => AP_SUBHEALERS.includes(m.classId)) || null) : null;
-    let val = 0, eCount = 0, cd = 0, healers = 0, carries = 0, hasU = false, hasL = false;
+    const ids = ms.map((m) => m.classId);
+    const has = (id) => ids.includes(id);
+    const any = (list) => list.some(has);
+
+    // --- healer
+    const healerMs = ms.filter((m) => AP_HEALERS.includes(m.classId));
+    const healers = healerMs.length;
+    // Sub-healer só assume a vaga se NENHUM arquivo tem healer verdadeiro para o conteúdo
+    const designated = !ctx.trueHealer ? (ms.find((m) => AP_SUBHEALERS.includes(m.classId)) || null) : null;
+    const healerOK = healers > 0 || !!designated;
+    const healerNative = healerMs.some((m) => !m.guest);
+
+    // --- carries (sets Unique/Legend) e mescla
+    const range = AP_CARRY_RANGE[N] || null;
+    const need = range ? range[0] : 0;
+    const maxCarry = range ? range[1] : N;
+    let carries = 0, hasU = false, hasL = false, val = 0;
     ms.forEach((m) => {
       val += m.val;
-      if (AP_HEALERS.includes(m.classId)) healers++;
-      if (!m.guest && apElementsOf(m.classId).includes(E)) eCount++;
-      const ci = AP_CD_PRIORITY.indexOf(m.classId);
-      if (ci >= 0) cd += (AP_CD_PRIORITY.length - ci) * 8; else if (AP_CD_CLASSES.includes(m.classId)) cd += 6;
       if (m !== designated && m.carry && !m.guest) {
         carries++;
         if (m.setRank === 2) hasU = true;
         if (m.setRank === 3) hasL = true;
       }
     });
-    const healerOK = hasTrue || !!designated;
     const mix = hasU && hasL;
-    const hasCD = ms.some((m) => AP_CD_CLASSES.includes(m.classId));
-    const hasBurst = ms.some((m) => AP_BURST_CLASSES.includes(m.classId));
-    const cdNeeded = ms.some((m) => AP_CD_DEPENDENTS.includes(m.classId));
-    const burstNeeded = ms.some((m) => AP_BURST_DEPENDENTS.includes(m.classId));
-    const tanks = ms.filter((m) => AP_TANKS.includes(m.classId));
-    // Tank sempre acompanhado de DPS: metade (arredondada p/ cima) dos demais precisa ser DPS.
-    const dpsOthers = ms.filter((m) => !AP_TANKS.includes(m.classId) && apRoles(m.classId).includes("DPS")).length;
-    const tankOK = !tanks.length || dpsOthers >= Math.ceil((N - 1) / 2);
-    const cdOK = !cdNeeded || hasCD;
-    const burstOK = !burstNeeded || hasBurst;
 
-    let score = val + (healerOK ? 1000 : 0) + Math.min(carries, need) * 300 + Math.min(eCount, minE) * 400
-              + (mix ? 40 : 0) + cd - Math.max(0, healers - 1) * 60
-              + (hasCD ? 60 : 0) + (hasBurst ? 60 : 0);
-    if (final) {
-      if (!cdOK) score -= 500;
-      if (!burstOK) score -= 500;
-      if (!tankOK) score -= 800;
+    // --- elemento
+    const eCount = ms.filter((m) => !m.guest && apElementsOf(m.classId).includes(E)).length;
+    const neutralPair = N === 2 && ms.length === 2 && ms.every((m) => apIsNeutral(m.classId));
+    const minE = apMinElement(N);
+    const elementOK = eCount >= minE || neutralPair;
+
+    // --- tank
+    const tankMs = ms.filter((m) => AP_TANKS.includes(m.classId));
+    const tanks = tankMs.length;
+    const tankOK = N >= 8 ? tanks === 1 : N >= 6 ? any(AP_HYBRID_TANKS) : true;
+    let tankWithDps = true;
+    if (tanks === 1) {
+      const t = tankMs[0];
+      const others = ms.filter((m) => m !== t && m !== designated && !AP_HEALERS.includes(m.classId));
+      const dpsCount = others.filter((m) => AP_DPS.includes(m.classId) || AP_SUBDPS.includes(m.classId)).length;
+      tankWithDps = N === 2 ? ms.filter((m) => m !== t).every((m) => AP_DPS.includes(m.classId))
+                            : dpsCount >= Math.ceil((N - 2) / 2);
     }
-    return { score, healerOK, subHealerUsed: !!designated, carries, need, eCount, minE, designated, mix,
-             cdNeeded, cdOK, burstNeeded, burstOK, tankPresent: tanks.length > 0, tankOK };
+
+    // --- party de 2: nunca 2 suportes/healers; suporte só com DPS; ou 2 SubDPS
+    let pairOK = true;
+    if (N === 2 && ms.length === 2) {
+      const sups = ms.filter((m) => AP_SUPPORT.includes(m.classId));
+      if (sups.length >= 2) pairOK = false;
+      else if (sups.length === 1 && !AP_DPS.includes(ms.find((m) => m !== sups[0]).classId)) pairOK = false;
+    }
+
+    // --- dependências de cooldown e de burst de atributo
+    const cdNeeded = any(AP_NEEDS_CD);
+    const cdOK = !cdNeeded || any(AP_CD_PRIORITY);
+    const burstDeps = ms.filter((m) => AP_NEEDS_BURST.includes(m.classId));
+    const burstNeeded = burstDeps.length > 0;
+    const burstOK = !burstNeeded || ms.some((m) => AP_BURST.includes(m.classId) && !burstDeps.every((d) => d === m));
+
+    const offCount = ms.filter((m) => m.gtype === "off").length;   // só existe no modo "relaxado"
+
+    // --- pontuação
+    let score = val - offCount * 1500;
+    score += healerOK ? 5000 : 0;
+    score += healerNative ? 300 : 0;                       // healer do elemento da party tem prioridade
+    score -= Math.max(0, healers - 1) * 800;               // só 1 healer
+    if (range) {
+      score += Math.min(carries, need) * 400 + Math.max(0, Math.min(carries, maxCarry) - need) * 40;
+      score -= Math.max(0, carries - maxCarry) * 1200;     // acima do teto (só ocorre nas passadas relaxadas)
+      if (carries >= 2 && mix) score += 350;               // mescla Unique + Legend
+    }
+    score += Math.min(eCount, minE) * 500;
+    if (N >= 6) score += Math.min(Math.max(eCount - minE, 0), 2) * 150;   // 5º e 6º do elemento
+    if (N === 2) { score += neutralPair ? 500 : 0; score += eCount >= 2 ? 100 : 0; }
+    if (N >= 6 && tankOK) score += 2500;
+    AP_CD_PRIORITY.forEach((id, i) => { if (has(id)) score += (AP_CD_PRIORITY.length - i) * 12; });
+    if (final) {
+      if (!tankWithDps) score -= 1500;
+      if (!pairOK) score -= 4000;
+      if (!cdOK) score -= 800;
+      if (!burstOK) score -= 800;
+    }
+    return { score, healerOK, healers, designated, healerNative, carries, need, maxCarry, hasU, hasL, mix,
+             eCount, minE, elementOK, neutralPair, tanks, tankOK, tankWithDps, pairOK,
+             cdNeeded, cdOK, burstNeeded, burstOK, offCount };
   }
 
-  // Beam search: um personagem por arquivo (jogador); classes únicas, no máx. 1 tank, só 1 convidado Ice.
-  function apPlanForElement(files, N, E, ctx) {
-    let beam = [{ ms: [], classes: [], tanks: 0, guests: 0, score: 0 }];
+  // Regras duras ao adicionar um personagem ao estado do beam. Devolve { guest, gtype } ou null.
+  function apTryAdd(st, c, E, N, ctx, relax, capOn) {
+    const g = apTryAddBase(st, c, E, N, ctx, relax);
+    if (g && capOn && !g.guest && c.carry) {
+      const range = AP_CARRY_RANGE[N];
+      if (range && (st.carryCount || 0) >= range[1]) return null;   // no máx. N carries na party
+    }
+    return g;
+  }
+  function apTryAddBase(st, c, E, N, ctx, relax) {
+    if (st.classes.includes(c.classId)) return null;                       // sem classes repetidas
+    if (AP_TANKS.includes(c.classId) && st.tanks >= 1) return null;        // no máx. 1 tank
+    if (N === 6 && AP_PURE_TANKS.includes(c.classId)) return null;         // party de 6: tank não pode ser só tanker
+    // Party de fogo: neutro que não seja suporte é proibido (vale também no modo relaxado)
+    if (AP_NEUTRAL.includes(c.classId) && !apNeutralAllowed(c.classId, E)) return null;
+    const slotClass = AP_SUPPORT_SLOT.includes(c.classId);
+    if (apFits(c.classId, E)) {
+      if (slotClass && st.ig > 0) return null;
+      return { guest: false, gtype: null };
+    }
+    // Fora do elemento: NUNCA. A party é sempre do elemento escolhido ou neutro (ex.: Dark não entra em party Fire).
+    return null;
+  }
+
+  // Beam search: um personagem por arquivo (jogador).
+  // Assinatura de uma composição = classes usadas (a mesma chave que o beam usa para distinguir composições)
+  const apSig = (ms) => ms.map((m) => m.classId).sort().join(",");
+
+  function apPlanForElement(files, N, E, ctx, relax, capOn, exclude) {
+    let beam = [{ ms: [], classes: [], tanks: 0, fh: 0, ig: 0, slotCount: 0, carryCount: 0, score: 0 }];
     for (let i = 0; i < N; i++) {
+      const final = i === N - 1;
       const next = new Map();
       for (const st of beam) {
         for (const c of files[i]) {
-          if (st.classes.includes(c.classId)) continue;
-          const isTank = AP_TANKS.includes(c.classId);
-          if (isTank && st.tanks >= 1) continue;
-          let guest = false;
-          if (!apFits(c.classId, E)) {
-            if (apIceGuest(c.classId, E) && st.guests < 1) guest = true; else continue;
-          }
-          const ms = st.ms.concat({ ...c, file: i, guest });
-          const ev = apEvaluate(ms, E, N, ctx, false);
+          const g = apTryAdd(st, c, E, N, ctx, relax, capOn);
+          if (!g) continue;
+          const ms = st.ms.concat({ ...c, file: i, guest: g.guest, gtype: g.gtype });
+          const ev = apEvaluate(ms, E, N, ctx, final);
           const classes = st.classes.concat(c.classId);
-          const key = classes.slice().sort().join(",") + "|" + ev.carries + (ev.mix ? "m" : "");
+          const key = classes.slice().sort().join(",") + "|" + ev.carries + (ev.hasU ? "u" : "") + (ev.hasL ? "l" : "") + (ev.healerOK ? "h" : "");
           const cur = next.get(key);
           if (!cur || ev.score > cur.score) {
-            next.set(key, { ms, classes, tanks: st.tanks + (isTank ? 1 : 0), guests: st.guests + (guest ? 1 : 0), score: ev.score });
+            next.set(key, {
+              ms, classes, score: ev.score,
+              tanks: st.tanks + (AP_TANKS.includes(c.classId) ? 1 : 0),
+              fh: st.fh + (g.gtype === "healer" ? 1 : 0),
+              ig: st.ig + (g.gtype === "ice" ? 1 : 0),
+              slotCount: st.slotCount + (slotClassOf(c.classId) ? 1 : 0),
+              carryCount: st.carryCount + (!g.guest && c.carry ? 1 : 0)
+            });
           }
         }
       }
-      beam = Array.from(next.values()).sort((a, b) => b.score - a.score).slice(0, AP_BEAM);
+      beam = Array.from(next.values()).sort((a, b) => b.score - a.score).slice(0, N >= 8 ? 600 : AP_BEAM);
       if (!beam.length) return null;
     }
-    let best = null;
-    beam.forEach((st) => {
-      const ev = apEvaluate(st.ms, E, N, ctx, true);
-      if (!best || ev.score > best.eval.score) best = { element: E, members: st.ms, eval: ev, score: ev.score };
-    });
-    return best;
+    // beam já vem ordenado do melhor para o pior: pega a melhor que ainda não foi rejeitada
+    const top = beam.find((st) => !exclude || !exclude.has(apSig(st.ms)));
+    if (!top) return null;
+    const ev = apEvaluate(top.ms, E, N, ctx, true);
+    return { element: E, members: top.ms, eval: ev, score: ev.score, relaxed: !!relax };
   }
+  const slotClassOf = (id) => AP_SUPPORT_SLOT.includes(id);
 
   // Testa os 4 elementos-base e devolve a melhor party (ou null).
-  function apBuildBestParty(files, N) {
-    const ctx = { healerAvail: files.slice(0, N).some((cs) => cs.some((c) => AP_HEALERS.includes(c.classId))) };
+  // 1ª passada: regras de elemento estritas. Se nenhuma party for possível, 2ª passada relaxada
+  // (classes de outro elemento entram com penalidade e aparecem como violação no resultado).
+  function apBuildBestParty(files, N, exclude) {
+    const ctx = apContext(files);
     let best = null;
-    AP_ELEMENT_KEYS.forEach((E) => {
-      const plan = apPlanForElement(files, N, E, ctx);
-      if (plan && (!best || plan.score > best.score)) best = plan;
+    // Sem passada "relaxada": classe de outro elemento nunca entra. Só se afrouxa o teto de carries.
+    [[false, true], [false, false]].forEach(([relax, capOn]) => {
+      if (best) return;
+      AP_ELEMENT_KEYS.forEach((E) => {
+        const plan = apPlanForElement(files, N, E, ctx, relax, capOn, exclude);
+        if (plan && (!best || plan.score > best.score)) best = plan;
+      });
     });
+    if (best && best.eval.eCount === 0 && best.eval.neutralPair) best.element = "neutral";
     return best;
   }
 
   function apRoleTags(m, ev) {
-    const tags = apRoles(m.classId).filter((r) => r !== "SubHealer");
-    if (ev.designated === m) tags.unshift("SubHealer");
-    if (AP_CD_CLASSES.includes(m.classId)) tags.push("Cooldown");
+    const tags = [];
+    if (AP_HEALERS.includes(m.classId)) tags.push("Healer");
+    else if (ev.designated === m) tags.push("Sub-Healer");
+    if (AP_TANKS.includes(m.classId)) tags.push("Tank");
+    if (AP_SUPPORT.includes(m.classId) && !AP_HEALERS.includes(m.classId) && !AP_TANKS.includes(m.classId)) tags.push("Support");
+    else if (AP_NEUTRAL_SUPPORT.includes(m.classId)) tags.push("Support");
     if (m !== ev.designated && m.carry && !m.guest) tags.push("Carry");
+    if (AP_CD_PRIORITY.includes(m.classId)) tags.push("CD");
+    if (AP_BURST.includes(m.classId)) tags.push("Burst");
+    if (m.gtype === "off") tags.push("Off");
+    else if (m.guest) tags.push("Guest");
+    if (!tags.some((t) => ["Healer", "Sub-Healer", "Tank", "Support", "Carry"].includes(t))) tags.unshift(AP_DPS.includes(m.classId) ? "DPS" : "SubDPS");
     return tags;
   }
   /* AP-LOGIC-END */
@@ -5024,15 +5885,141 @@ document.addEventListener("DOMContentLoaded", () => {
   const genBtn     = document.getElementById("apGenerate");
   const resetBtn   = document.getElementById("apReset");
   const resultEl   = document.getElementById("apResult");
+  const historyEl  = document.getElementById("apHistory");
+  const histClearBtn = document.getElementById("apHistoryClear");
+  const onlineListEl = document.getElementById("apOnlineList");
+  const onlineCountEl = document.getElementById("apOnlineCount");
+  const onlineMsgEl = document.getElementById("apOnlineMsg");
+  const onlineOpenBtn = document.getElementById("apOnlineOpen");
+  const onlineStatusEl = document.getElementById("apOnlineStatus");
+  const invitePanel = document.getElementById("apInvitePanel");
+  const inviteCloseBtn = document.getElementById("apInviteClose");
+  const inviteBackdrop = document.getElementById("apInviteBackdrop");
 
   const PARTY_SIZES = [2, 4, 6, 8];
+  // Conteúdos por tipo de party. Party-4 = todo o resto. As chaves são os títulos gravados nos backups
+  // (por isso "Typhoom Kim Hardcore" mantém a grafia do backup).
+  const AP_HIDDEN_CONTENTS = ["Missão diária", "Circus: Boss Rush", "Hero Battlefield", "Circus: Monastery"];
+  const AP_CONTENTS_BY_SIZE = {
+    2: ["Duel Dragon", "Dragon Fellowship"],
+    6: ["Typhoom Kim Hardcore", "Professor K Hardcore"],
+    8: ["Desert Dragon Hardcore", "Red Dragon Normal", "Red Dragon Hardcore", "Ice Dragon Normal"]
+  };
+  function apContentsFor(n) {
+    const fixed = AP_CONTENTS_BY_SIZE[n];
+    if (fixed) return ALL_CONTENTS.filter((t) => fixed.includes(t));
+    const taken = [].concat(...Object.values(AP_CONTENTS_BY_SIZE));
+    return ALL_CONTENTS.filter((t) => !AP_HIDDEN_CONTENTS.includes(t) && !taken.includes(t));
+  }
+  const HISTORY_KEY = "dnAutoPartyHistory";
   let partySize = 4;
   let contentTitle = "";
-  const slots = new Array(8).fill(null); // { name, data } por arquivo carregado
+  const slots = new Array(8).fill(null);   // { name, data, source? } por arquivo carregado (source = veio de um convite online)
+  const dirty = new Set();                 // arquivos marcados como concluídos e ainda não baixados
+  let lastPlan = null;                     // { plan, content, size, concluded }
+  // Personagens concluídos nesta sessão (chave: arquivo/pessoa + classe + nick + conteúdo). Garante que, mesmo que o
+  // arquivo seja carregado de novo ou a pessoa seja convidada de novo (dados "frescos" sem a marcação), quem já
+  // concluiu o conteúdo não volta a ser sugerido.
+  const concluded = new Set();
+  const slotKey = (s) => (s ? (s.source ? "on:" + s.source.pub : "f:" + s.name) : "");
+  const concludedKey = (s, ch, content) => slotKey(s) + "|" + (ch.classId || "") + "|" + (ch.nickname || "") + "|" + content;
+  const rejected = new Set();              // composições já mostradas e descartadas (para "Gerar" trazer outra)
+
+  // Convites online enviados por mim: pub do convidado -> { reqId, name, classId, status, timer, startedAt }
+  // status: "waiting" (aguardando) | "declined" | "expired" | "error"
+  const SHARE_URL = "/api/party-share";
+  const INVITE_POLL_MS = 2000;
+  const INVITE_TIMEOUT_MS = 125000;        // um pouco acima do TTL de 120s do servidor
+  const invites = new Map();
 
   const T = (key, fb) => i18n(key, fb);
-  const EL_KEYS = { light: "apElLight", fire: "apElFire", dark: "apElDark", ice: "apElIce" };
-  const EL_FB = { light: "Light", fire: "Fire", dark: "Dark", ice: "Ice" };
+  const EL_KEYS = { light: "apElLight", fire: "apElFire", dark: "apElDark", ice: "apElIce", neutral: "apElNeutral" };
+  const EL_FB = { light: "Light", fire: "Fire", dark: "Dark", ice: "Ice", neutral: "Neutro" };
+  const elLabel = (k) => T(EL_KEYS[k], EL_FB[k]);
+
+  // ---------------------------------------------------------------- histórico (só da sessão)
+  // O histórico vive apenas em memória: ao sair do site e entrar de novo ele começa zerado.
+  // A chave antiga do localStorage (versões anteriores salvavam lá) é apagada para não "voltar" do cache.
+  try { localStorage.removeItem(HISTORY_KEY); } catch (_) { /* sem storage */ }
+  let history = [];
+  function saveHistory() {
+    history = history.slice(0, 60);
+  }
+
+  // Rótulo Classe "nickname" (igual à tabela da tela inicial): classe com a fonte do título
+  // "Criador de Grupos" e nickname com a fonte dos botões.
+  function apNickLabel(clsName, nick) {
+    const wrap = document.createElement("span");
+    wrap.className = "ap-nick-label";
+    const c = document.createElement("span");
+    c.className = "ap-nick-class";
+    c.textContent = clsName;
+    wrap.appendChild(c);
+    if (nick) {
+      const n = document.createElement("span");
+      n.className = "ap-nick-name";
+      n.textContent = '"' + nick + '"';
+      wrap.appendChild(n);
+    }
+    wrap.title = nick ? clsName + ' "' + nick + '"' : clsName;
+    return wrap;
+  }
+
+  function renderHistory() {
+    historyEl.textContent = "";
+    histClearBtn.classList.toggle("hidden", !history.length);
+    if (!history.length) {
+      historyEl.appendChild(note(T("apHistoryEmpty", "Nenhuma party gerada ainda.")));
+      return;
+    }
+    history.forEach((h) => {
+      const row = document.createElement("div");
+      row.className = "ap-hist-item" + (h.done ? " done" : "");
+
+      const head = document.createElement("div");
+      head.className = "ap-hist-head";
+      const title = document.createElement("strong");
+      title.className = "ap-hist-title";
+      title.textContent = getContentLabel(h.content) + " · Party-" + h.size + " · " + elLabel(h.element);
+      const status = document.createElement("span");
+      status.className = "ap-hist-status " + (h.done ? "ok" : "pending");
+      status.textContent = h.done ? "✔ " + T("apDoneLabel", "Concluído") : "⏳ " + T("apPendingLabel", "Pendente");
+      const date = document.createElement("span");
+      date.className = "ap-hist-date";
+      date.textContent = new Date(h.done && h.doneAt ? h.doneAt : h.ts).toLocaleString();
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "ap-hist-del";
+      del.textContent = "✕";
+      del.title = T("compRemoveTitle", "Remover");
+      del.addEventListener("click", () => {
+        history = history.filter((x) => x.id !== h.id);
+        saveHistory(); renderHistory();
+      });
+      head.appendChild(title); head.appendChild(status); head.appendChild(date); head.appendChild(del);
+
+      const members = document.createElement("div");
+      members.className = "ap-hist-members";
+      h.members.forEach((m) => {
+        const cls = ALL_CLASSES.find((c) => c.id === m.classId);
+        const chip = document.createElement("span");
+        chip.className = "ap-hist-member";
+        const img = document.createElement("img");
+        img.src = "img/classes/" + m.classId + ".png";
+        img.alt = "";
+        img.onerror = () => { img.style.display = "none"; };
+        const txt = apNickLabel(cls ? getClassName(cls) : m.classId, m.nick);
+        chip.appendChild(img); chip.appendChild(txt);
+        members.appendChild(chip);
+      });
+
+      row.appendChild(head); row.appendChild(members);
+      historyEl.appendChild(row);
+    });
+  }
+
+  // ---------------------------------------------------------------- seleção de tipo / conteúdo / arquivos
+  function clearResult() { resultEl.textContent = ""; lastPlan = null; }
 
   function renderTypes() {
     typesEl.textContent = "";
@@ -5041,7 +6028,11 @@ document.addEventListener("DOMContentLoaded", () => {
       b.type = "button";
       b.className = "ap-type-btn" + (n === partySize ? " active" : "");
       b.textContent = "Party-" + n;
-      b.addEventListener("click", () => { partySize = n; resultEl.textContent = ""; renderTypes(); renderFiles(); });
+      b.addEventListener("click", () => {
+        partySize = n;
+        if (!apContentsFor(n).includes(contentTitle)) contentTitle = "";   // conteúdo não existe neste tipo de party
+        rejected.clear(); clearResult(); renderTypes(); renderContentOptions(); renderFiles(); renderOnline();
+      });
       typesEl.appendChild(b);
     });
   }
@@ -5050,9 +6041,9 @@ document.addEventListener("DOMContentLoaded", () => {
     contentSel.textContent = "";
     const ph = document.createElement("option");
     ph.value = "";
-    ph.textContent = "— " + T("apContent", "Conteúdo") + " —";
+    ph.textContent = T("apSelectContent", "Selecione o Conteúdo");
     contentSel.appendChild(ph);
-    ALL_CONTENTS.forEach((title) => {
+    apContentsFor(partySize).forEach((title) => {
       const o = document.createElement("option");
       o.value = title;
       o.textContent = getContentLabel(title);
@@ -5076,7 +6067,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const info = document.createElement("span");
       info.className = "ap-file-info";
       if (slots[i]) {
-        info.textContent = slots[i].name + " · " + slots[i].data.characters.length + " " + T("apChars", "personagens");
+        info.textContent = slots[i].name + " · " + slots[i].data.characters.length + " " + T("apChars", "personagens")
+          + (slots[i].source ? " · " + T("apViaOnline", "online") : "")
+          + (dirty.has(i) ? " · " + T("apFileUpdated", "atualizado") : "")
+          + (slots[i].synced ? " · " + T("apSyncedOnline", "atualizado online") : "");
       }
       const input = document.createElement("input");
       input.type = "file";
@@ -5092,17 +6086,29 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = JSON.parse(e.target.result);
             if (!data || !Array.isArray(data.characters)) throw new Error("format");
             slots[i] = { name: file.name, data };
+            dirty.delete(i);
           } catch (_) {
             slots[i] = null;
             alert(T("apBadFile", "Arquivo inválido") + ": " + file.name);
           }
-          resultEl.textContent = "";
-          renderFiles();
+          rejected.clear(); clearResult(); updateDl(); renderFiles(); renderOnline();
         };
         reader.readAsText(file);
       });
       box.appendChild(lab);
       box.appendChild(pick);
+      if (slots[i]) {
+        const clr = document.createElement("button");
+        clr.type = "button";
+        clr.className = "ap-file-clear";
+        clr.textContent = "✕";
+        clr.title = T("apClearSlot", "Remover");
+        clr.addEventListener("click", () => {
+          slots[i] = null; dirty.delete(i);
+          rejected.clear(); clearResult(); updateDl(); renderFiles(); renderOnline();
+        });
+        box.appendChild(clr);
+      }
       box.appendChild(info);
       box.appendChild(input);
       filesEl.appendChild(box);
@@ -5116,15 +6122,22 @@ document.addEventListener("DOMContentLoaded", () => {
     return p;
   }
 
+  // Sem botão de download: a marcação de concluído vai direto para a tabela do líder e, online, para a dos convidados.
+  function updateDl() { /* mantido só para não quebrar as chamadas existentes */ }
+
+  // ---------------------------------------------------------------- gerar
   function generate() {
-    resultEl.textContent = "";
+    // Party anterior ainda pendente = usuário não gostou: descarta e traz a próxima melhor composição diferente
+    if (lastPlan && !lastPlan.concluded) rejected.add(apSig(lastPlan.plan.members));
+    clearResult();
     const ready = contentTitle && slots.slice(0, partySize).every(Boolean);
     if (!ready) { resultEl.appendChild(note(T("apMissing", "Escolha o conteúdo e carregue todos os arquivos."), "warn")); return; }
 
     const files = [];
     let empty = false;
     for (let i = 0; i < partySize; i++) {
-      const c = apCandidates(slots[i].data, contentTitle);
+      const sl = slots[i];
+      const c = apCandidates(sl.data, contentTitle, (ch) => concluded.has(concludedKey(sl, ch, contentTitle)));
       files.push(c);
       if (!c.length) {
         empty = true;
@@ -5133,17 +6146,114 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (empty) return;
 
-    const plan = apBuildBestParty(files, partySize);
+    let plan = apBuildBestParty(files, partySize, rejected);
+    if (!plan && rejected.size) {
+      // acabaram as combinações diferentes: recomeça pela melhor
+      rejected.clear();
+      plan = apBuildBestParty(files, partySize);
+      if (plan) resultEl.appendChild(note(T("apNoMore", "Não há mais combinações diferentes: recomeçando pela melhor.")));
+    }
     if (!plan) { resultEl.appendChild(note(T("apNoResult", "Não foi possível formar uma party com esses arquivos."), "warn")); return; }
+    plan.attempt = rejected.size + 1;
+
+    // Gerar não entra no histórico: só o conteúdo concluído é contabilizado (ver concludeCurrent)
+    lastPlan = { plan, content: contentTitle, size: partySize, concluded: false };
     renderResult(plan);
   }
 
+  // ---------------------------------------------------------------- concluir conteúdo
+  // Avisa online quem foi importado pelo convite: o arquivo dessa pessoa NÃO é baixado — o servidor
+  // entrega o aviso no heartbeat dela e o conteúdo é marcado como concluído na tabela dela.
+  async function notifyOnlineDone(pub, slot, content, chars) {
+    try {
+      const res = await fetch(SHARE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete", id: window.dnDeviceId, to: pub, content, chars })
+      });
+      if (!res.ok) throw new Error("complete " + res.status);
+      slot.synced = true;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function concludeCurrent() {
+    if (!lastPlan || lastPlan.concluded) return;
+    const { plan, content, size } = lastPlan;
+    const online = new Map();   // pub -> { slot, chars: [{ classId, nickname }] }
+    plan.members.forEach((m) => {
+      const s = slots[m.file];
+      const chr = s && s.data.characters[m.idx];
+      const e = chr && chr.contents && chr.contents[m.ei];
+      if (e && e.title === content) {
+        e.done = true;
+        s.data.savedAt = Date.now();   // evita que o reset semanal do import "desfaça" a marcação
+        concluded.add(concludedKey(s, chr, content));
+        // Tabela do próprio líder (coluna de conteúdo): marca o mesmo personagem como concluído.
+        // Só arquivos locais; quem veio por convite online é atualizado na tela dele pelo aviso do servidor.
+        if (!(s.source && s.source.pub) && typeof window.dnMarkContentDone === "function") {
+          try { window.dnMarkContentDone(chr.classId, chr.nickname, content); } catch (_) { /* tabela indisponível */ }
+        }
+        if (s.source && s.source.pub) {
+          // arquivo vindo do convite online: atualizado online, sem baixar
+          const o = online.get(s.source.pub) || { slot: s, chars: [] };
+          o.chars.push({ classId: chr.classId || "", nickname: chr.nickname || "" });
+          online.set(s.source.pub, o);
+        } else {
+          dirty.add(m.file);
+        }
+      }
+    });
+    lastPlan.concluded = true;
+    rejected.clear();   // os arquivos mudaram (personagens concluídos): próxima party parte do zero
+    // histórico: só entra quando o conteúdo é concluído
+    const now = Date.now();
+    history.unshift({
+      id: now + "-" + Math.random().toString(36).slice(2, 7),
+      ts: now, doneAt: now, content, size, element: plan.element, done: true,
+      members: plan.members.slice().sort((a, b) => a.file - b.file).map((m) => ({ classId: m.classId, nick: m.nick, file: m.file }))
+    });
+    saveHistory(); renderHistory(); renderFiles(); updateDl();
+    const row = resultEl.querySelector(".ap-done-row");
+    if (row) {
+      row.textContent = "";
+      row.appendChild(note("✔ " + T("apDoneMsgOnline", "Conteúdo concluído. Gere uma nova party com os personagens restantes.")));
+      const failNote = () => note("⚠️ " + T("apSyncFail", "Não foi possível avisar {names} online. Convide a pessoa de novo e conclua o conteúdo outra vez."), "warn");
+      if (online.size) {
+        const pending = note("⏳ " + T("apSyncing", "Atualizando online os dados dos jogadores convidados…"));
+        row.appendChild(pending);
+        Promise.all(Array.from(online.entries()).map(async ([pub, o]) => ({ o, ok: await notifyOnlineDone(pub, o.slot, content, o.chars) }))).then((results) => {
+          pending.remove();
+          const failed = results.filter((r) => !r.ok).map((r) => r.o.slot.name);
+          if (failed.length) {
+            const n = failNote();
+            n.textContent = n.textContent.replace("{names}", failed.join(", "));
+            row.appendChild(n);
+          } else {
+            row.appendChild(note("📤 " + T("apSyncedMsg", "Os jogadores convidados foram avisados: o líder finalizou o conteúdo e o arquivo deles foi atualizado online.")));
+          }
+          renderFiles();
+        });
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- resultado
   function renderResult(plan) {
     const ev = plan.eval;
+    const N = partySize;
     const h = document.createElement("h4");
     h.className = "ap-result-title";
-    h.textContent = T("apResult", "Melhor composição") + " · " + T("apElement", "Elemento da party") + ": " + T(EL_KEYS[plan.element], EL_FB[plan.element]);
+    h.textContent = T("apResult", "Melhor composição") + " · " + T("apElement", "Elemento da party") + ": " + elLabel(plan.element)
+      + (plan.attempt > 1 ? " · " + T("apAlternative", "Alternativa") + " " + plan.attempt : "");
     resultEl.appendChild(h);
+
+    // Classes em 2 colunas (Arquivo 1 | Arquivo 2, Arquivo 3 | Arquivo 4, ...), para party de 2/4/6/8
+    const membersGrid = document.createElement("div");
+    membersGrid.className = "ap-members";
+    resultEl.appendChild(membersGrid);
 
     plan.members.slice().sort((a, b) => a.file - b.file).forEach((m) => {
       const cls = ALL_CLASSES.find((c) => c.id === m.classId);
@@ -5155,8 +6265,7 @@ document.addEventListener("DOMContentLoaded", () => {
       img.onerror = () => { img.style.visibility = "hidden"; };
       const who = document.createElement("div");
       who.className = "ap-member-who";
-      const name = document.createElement("strong");
-      name.textContent = (cls ? getClassName(cls) : m.classId) + (m.nick ? " — " + m.nick : "");
+      const name = apNickLabel(cls ? getClassName(cls) : m.classId, m.nick);
       const gear = document.createElement("span");
       gear.className = "ap-member-gear";
       gear.textContent = "Set: " + (m.setText || "—") + " · " + (m.weaponText || "—");
@@ -5174,19 +6283,31 @@ document.addEventListener("DOMContentLoaded", () => {
         tags.appendChild(s);
       });
       row.appendChild(img); row.appendChild(who); row.appendChild(tags); row.appendChild(file);
-      resultEl.appendChild(row);
+      membersGrid.appendChild(row);
     });
 
-    const checks = [
-      [ev.healerOK, ev.subHealerUsed ? T("apRuleSubHealer", "Sem healer disponível: SubHealer assumiu a vaga") : T("apRuleHealer", "1 healer")],
-      [partySize < 4 || ev.carries >= ev.need, T("apRuleCarry", "Mín. 50% carries com set Unique/Legend") + " (" + ev.carries + "/" + partySize + ")"],
-      [ev.eCount >= ev.minE, T("apRuleElement", "Mín. de classes do mesmo elemento") + " (" + ev.eCount + ")"],
-      [true, T("apRuleTank", "Máx. 1 tank")],
-      [true, T("apRuleDup", "Sem classes repetidas")]
-    ];
-    if (ev.tankPresent) checks.push([ev.tankOK, T("apRuleTankDps", "Tank acompanhado de DPS")]);
-    if (ev.cdNeeded) checks.push([ev.cdOK, T("apRuleCooldownDep", "Classes que dependem de Cooldown atendidas")]);
-    if (ev.burstNeeded) checks.push([ev.burstOK, T("apRuleBurstDep", "Classes que dependem de burst de atributo atendidas")]);
+    // ---- checklist das regras
+    const checks = [];
+    checks.push([ev.healerOK && ev.healers <= 1,
+      T("apRuleHealer", "1 healer") + (ev.designated ? " — " + T("apRuleSubHealer", "sub-healer (nenhum healer disponível nos arquivos)") : "")]);
+    if (N >= 4) {
+      checks.push([ev.carries >= ev.need && ev.carries <= ev.maxCarry, T("apRuleCarry", "Carries com set Unique/Legend") + " (" + ev.carries + " · " + ev.need + "–" + ev.maxCarry + ")"]);
+      checks.push([ev.carries < 2 || ev.mix, T("apRuleMix", "Carries mesclando Unique e Legend")]);
+    }
+    const minTxt = N >= 6 ? "mín. " + ev.minE + ", ideal 5–6" : "mín. " + ev.minE;
+    checks.push([ev.elementOK, ev.neutralPair
+      ? T("apRuleNeutralPair", "2 classes neutras")
+      : T("apRuleElement", "Classes do elemento") + " (" + ev.eCount + " · " + minTxt + ")"]);
+    if (N >= 6) checks.push([ev.tankOK, N === 8
+      ? T("apRuleTank8", "1 tank")
+      : T("apRuleTank6", "1 tank DPS/SubDPS (Crusader ou Defensio)")]);
+    if (ev.tanks > 0) checks.push([ev.tankWithDps, T("apRuleTankDps", "Tank acompanhado de DPS")]);
+    if (N === 2) checks.push([ev.pairOK, T("apRulePair", "Sem 2 suportes/healers — suporte junto de DPS")]);
+    if (ev.cdNeeded) checks.push([ev.cdOK, T("apRuleCd", "Sentinel/Gear Master/Moonlord com classe de cooldown")]);
+    if (ev.burstNeeded) checks.push([ev.burstOK, T("apRuleBurst", "Barbarian/Moonlord/Sniper/Crusader com classe de burst")]);
+    if (ev.offCount > 0) checks.push([false, T("apRuleOff", "Sem classes de outro elemento") + " (" + ev.offCount + ")"]);
+    checks.push([true, T("apRuleTank", "Máx. 1 tank") + " · " + T("apRuleDup", "Sem classes repetidas")]);
+
     const list = document.createElement("ul");
     list.className = "ap-checks";
     checks.forEach(([ok, text]) => {
@@ -5195,25 +6316,289 @@ document.addEventListener("DOMContentLoaded", () => {
       li.textContent = (ok ? "✔ " : "✖ ") + text;
       list.appendChild(li);
     });
-    resultEl.appendChild(list);
+
+    // ---- botão de conteúdo concluído
+    const doneRow = document.createElement("div");
+    doneRow.className = "ap-done-row";
+    const doneBtn = document.createElement("button");
+    doneBtn.type = "button";
+    doneBtn.className = "side-menu-item ap-done-btn";
+    doneBtn.textContent = "✔ " + T("apMarkDone", "Conteúdo concluído");
+    doneBtn.addEventListener("click", concludeCurrent);
+    doneRow.appendChild(doneBtn);
+
+    // Regras à esquerda e botão à direita, na mesma grade de 2 colunas dos arquivos:
+    // o botão fica na coluna do Arquivo 2/4 (canto direito), ao lado do checklist.
+    const bottom = document.createElement("div");
+    bottom.className = "ap-bottom";
+    bottom.appendChild(list);
+    bottom.appendChild(doneRow);
+    resultEl.appendChild(bottom);
   }
 
-  function renderAll() { renderTypes(); renderContentOptions(); renderFiles(); }
+  // ---------------------------------------------------------------- convite online
+  let onlineMsgTimer = null;
+  function onlineMsg(text) {
+    if (!onlineMsgEl) return;
+    onlineMsgEl.textContent = text || "";
+    clearTimeout(onlineMsgTimer);
+    if (text) onlineMsgTimer = setTimeout(() => { onlineMsgEl.textContent = ""; }, 7000);
+  }
 
-  contentSel.addEventListener("change", () => { contentTitle = contentSel.value; resultEl.textContent = ""; });
+  // Arquivo (dentro do tipo de party atual) que já foi preenchido por essa pessoa, ou -1
+  function slotOf(pub) {
+    for (let i = 0; i < partySize; i++) if (slots[i] && slots[i].source && slots[i].source.pub === pub) return i;
+    return -1;
+  }
+  function freeSlot() {
+    for (let i = 0; i < partySize; i++) if (!slots[i]) return i;
+    return -1;
+  }
+
+  // Janela de convite (entra da esquerda para a direita; fecha ao escolher alguém)
+  function openInvitePanel() {
+    if (!invitePanel) return;
+    renderOnline();
+    invitePanel.classList.add("open");
+    if (inviteBackdrop) inviteBackdrop.classList.add("open");
+    invitePanel.setAttribute("aria-hidden", "false");
+  }
+  function closeInvitePanel(instant) {
+    if (!invitePanel) return;
+    if (instant) { invitePanel.classList.add("no-anim"); if (inviteBackdrop) inviteBackdrop.classList.add("no-anim"); }
+    invitePanel.classList.remove("open");
+    if (inviteBackdrop) inviteBackdrop.classList.remove("open");
+    invitePanel.setAttribute("aria-hidden", "true");
+    if (onlineOpenBtn) onlineOpenBtn.blur();
+    if (instant) { void invitePanel.offsetWidth; invitePanel.classList.remove("no-anim"); if (inviteBackdrop) inviteBackdrop.classList.remove("no-anim"); }
+  }
+  const invitePanelOpen = () => !!invitePanel && invitePanel.classList.contains("open");
+
+  // Resumo dos convites na tela da party (a lista fica na janela, que fecha ao convidar)
+  function renderInviteStatus() {
+    if (!onlineStatusEl) return;
+    onlineStatusEl.textContent = "";
+    invites.forEach((st) => {
+      const key = st.status === "waiting" ? ["apInviteWaiting", "Aguardando…", "wait"]
+        : st.status === "declined" ? ["apInviteDeclined", "Recusou", "bad"]
+        : st.status === "expired" ? ["apInviteExpired", "Sem resposta", "bad"]
+        : st.status === "error" ? ["apInviteError", "Falhou", "bad"] : null;
+      if (!key) return;
+      const line = document.createElement("div");
+      line.className = "ap-online-status " + key[2];
+      line.textContent = st.name + " — " + T(key[0], key[1]);
+      onlineStatusEl.appendChild(line);
+    });
+  }
+
+  function renderOnline() {
+    renderInviteStatus();
+    if (!onlineListEl) return;
+    const keep = onlineListEl.scrollTop;
+    onlineListEl.textContent = "";
+    const live = typeof window.isPresenceLive === "function" && window.isPresenceLive();
+    const users = ((typeof window.getOnlineUsers === "function" && window.getOnlineUsers()) || []).slice();
+    // convite em andamento continua visível mesmo se a pessoa sumiu da lista por um instante
+    invites.forEach((st, pub) => {
+      if (st.status === "waiting" && !users.some((u) => u.pub === pub)) users.push({ pub, name: st.name, classId: st.classId });
+    });
+    onlineCountEl.textContent = live && users.length ? "(" + users.length + ")" : "";
+
+    if (!live && !users.length) {
+      const localMode = typeof window.isLocalMode === "function" && window.isLocalMode();
+      onlineListEl.appendChild(note(localMode
+        ? T("apOnlineLocal", "Modo local: os convites só funcionam no site publicado ou com \"wrangler dev\".")
+        : T("apOnlineOffline", "Convites indisponíveis: não foi possível falar com o servidor."))); return; }
+    if (!users.length) {
+      const total = typeof window.getOnlineTotal === "function" ? window.getOnlineTotal() : 0;
+      const others = Math.max(0, total - 1);   // o total inclui a própria pessoa
+      onlineListEl.appendChild(note(T("apOnlineEmpty", "Ninguém online com personagens no momento.")
+        + (others > 0 ? " (" + others + " " + T("apOnlineNoChars", "online sem classe na tabela ou com versão antiga do site") + ")" : "")));
+      return;
+    }
+
+    users.forEach((u) => {
+      const st = invites.get(u.pub);
+      const waiting = st && st.status === "waiting";
+      const loaded = slotOf(u.pub);
+
+      const row = document.createElement("div");
+      row.className = "ap-online-item";
+      const img = document.createElement("img");
+      img.src = "img/classes/" + encodeURIComponent(u.classId || "") + ".png";
+      img.alt = "";
+      img.onerror = () => { img.style.visibility = "hidden"; };
+      const name = document.createElement("span");
+      name.className = "ap-online-name";
+      name.textContent = u.name;
+      name.title = u.name;
+      const status = document.createElement("span");
+      status.className = "ap-online-status";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ap-file-btn";
+
+      if (waiting) {
+        status.textContent = T("apInviteWaiting", "Aguardando…");
+        status.classList.add("wait");
+        btn.textContent = T("apInviteCancel", "Cancelar");
+        btn.addEventListener("click", () => cancelInvite(u.pub));
+      } else {
+        if (st && st.status === "declined") { status.textContent = T("apInviteDeclined", "Recusou"); status.classList.add("bad"); }
+        else if (st && st.status === "expired") { status.textContent = T("apInviteExpired", "Sem resposta"); status.classList.add("bad"); }
+        else if (st && st.status === "error") { status.textContent = T("apInviteError", "Falhou"); status.classList.add("bad"); }
+        else if (loaded >= 0) { status.textContent = "✔ " + T("apFile", "Arquivo") + " " + (loaded + 1); status.classList.add("ok"); }
+        btn.textContent = T("apInvite", "Convidar");
+        btn.addEventListener("click", () => { btn.blur(); closeInvitePanel(); inviteUser(u); });
+      }
+      row.appendChild(img); row.appendChild(name); row.appendChild(status); row.appendChild(btn);
+      onlineListEl.appendChild(row);
+    });
+    onlineListEl.scrollTop = keep;
+  }
+
+  function stopInvite(pub) {
+    const st = invites.get(pub);
+    if (!st) return null;
+    clearTimeout(st.timer);
+    invites.delete(pub);
+    return st;
+  }
+
+  function cancelRemote(pub, reqId) {
+    if (!reqId) return;
+    fetch(SHARE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel", id: window.dnDeviceId, to: pub, reqId })
+    }).catch(() => {});
+  }
+
+  function cancelInvite(pub) {
+    const st = stopInvite(pub);
+    if (st) cancelRemote(pub, st.reqId);
+    renderOnline();
+  }
+  function cancelAllInvites() {
+    Array.from(invites.keys()).forEach((pub) => { const st = stopInvite(pub); if (st) cancelRemote(pub, st.reqId); });
+  }
+
+  async function inviteUser(u) {
+    const cur = invites.get(u.pub);
+    if (cur && cur.status === "waiting") return;
+    if (slotOf(u.pub) < 0 && freeSlot() < 0) {
+      onlineMsg(T("apInviteFull", "Todos os arquivos já estão preenchidos. Remova um (✕) para convidar."));
+      return;
+    }
+    onlineMsg("");
+    const st = { reqId: null, name: u.name, classId: u.classId, status: "waiting", timer: null, startedAt: Date.now() };
+    invites.set(u.pub, st);
+    renderOnline();
+    try {
+      const res = await fetch(SHARE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "invite", id: window.dnDeviceId, to: u.pub })
+      });
+      const j = await res.json().catch(() => ({}));
+      if (invites.get(u.pub) !== st) { if (j.reqId) cancelRemote(u.pub, j.reqId); return; }   // cancelado enquanto enviava
+      if (!res.ok || !j.reqId) {
+        invites.delete(u.pub);
+        if (j.error === "no_name") onlineMsg(T("apNeedChar", "Adicione uma classe à tabela primeiro: o nickname dela identifica você no convite."));
+        else if (j.error === "busy") onlineMsg(T("apInviteBusy", "Essa pessoa já tem convites pendentes. Tente de novo em instantes."));
+        else { invites.set(u.pub, Object.assign(st, { status: "error" })); }
+        renderOnline();
+        return;
+      }
+      st.reqId = j.reqId;
+      st.startedAt = Date.now();
+      pollInvite(u.pub, st);
+    } catch (_) {
+      if (invites.get(u.pub) === st) { st.status = "error"; renderOnline(); }
+    }
+  }
+
+  function pollInvite(pub, st) {
+    const tick = async () => {
+      if (invites.get(pub) !== st || st.status !== "waiting") return;
+      if (Date.now() - st.startedAt > INVITE_TIMEOUT_MS) {
+        st.status = "expired"; cancelRemote(pub, st.reqId); renderOnline(); return;
+      }
+      try {
+        const res = await fetch(SHARE_URL + "?req=" + encodeURIComponent(st.reqId) + "&to=" + encodeURIComponent(pub)
+          + "&id=" + encodeURIComponent(window.dnDeviceId), { cache: "no-store" });
+        const j = await res.json();
+        if (invites.get(pub) !== st) return;   // cancelado durante a requisição
+        if (j.status === "accepted") { receiveShared(pub, st, j.data); return; }
+        if (j.status === "declined") { st.status = "declined"; renderOnline(); return; }
+        if (j.status === "expired") { st.status = "expired"; renderOnline(); return; }
+      } catch (_) { /* falha de rede: tenta de novo até o tempo acabar */ }
+      st.timer = setTimeout(tick, INVITE_POLL_MS);
+    };
+    st.timer = setTimeout(tick, INVITE_POLL_MS);
+  }
+
+  // Dados chegaram: entram no mesmo slot que um arquivo escolhido à mão ocuparia.
+  function receiveShared(pub, st, data) {
+    if (!data || !Array.isArray(data.characters)) { st.status = "error"; renderOnline(); return; }
+    let idx = slotOf(pub);                    // convidar de novo a mesma pessoa atualiza o arquivo dela
+    if (idx < 0) idx = freeSlot();
+    if (idx < 0) {                            // todos ocupados enquanto esperava a resposta
+      stopInvite(pub);
+      onlineMsg(T("apInviteFull", "Todos os arquivos já estão preenchidos. Remova um (✕) para convidar."));
+      renderOnline();
+      return;
+    }
+    stopInvite(pub);
+    slots[idx] = { name: st.name, data, source: { pub, name: st.name } };
+    dirty.delete(idx);
+    rejected.clear(); clearResult(); updateDl(); renderFiles(); renderOnline();
+    if (typeof window.showToast === "function") {
+      window.showToast(T("apLoadedToast", "📥 {name} carregado no Arquivo {n}").replace("{name}", st.name).replace("{n}", idx + 1));
+    }
+  }
+
+  window.addEventListener("dn:online-users", () => { if (!overlay.classList.contains("hidden")) renderOnline(); });
+
+  function renderAll() { renderTypes(); renderContentOptions(); renderFiles(); renderOnline(); renderHistory(); updateDl(); }
+
+  contentSel.addEventListener("change", () => { contentTitle = contentSel.value; rejected.clear(); clearResult(); });
   genBtn.addEventListener("click", generate);
-  resetBtn.addEventListener("click", () => { slots.fill(null); contentTitle = ""; resultEl.textContent = ""; renderAll(); });
+  if (onlineOpenBtn) onlineOpenBtn.addEventListener("click", () => { onlineOpenBtn.blur(); openInvitePanel(); });
+  if (inviteCloseBtn) inviteCloseBtn.addEventListener("click", () => closeInvitePanel());
+  if (inviteBackdrop) inviteBackdrop.addEventListener("click", () => closeInvitePanel());
+  resetBtn.addEventListener("click", () => {
+    cancelAllInvites(); invites.clear(); onlineMsg("");
+    slots.fill(null); dirty.clear(); contentTitle = ""; rejected.clear(); clearResult(); renderAll();
+  });
+  histClearBtn.addEventListener("click", () => {
+    if (!confirm(T("apHistoryClearConfirm", "Apagar todo o histórico de parties?"))) return;
+    history = []; saveHistory(); renderHistory();
+  });
 
   openBtn.addEventListener("click", () => {
     if (sideMenuOverlay) sideMenuOverlay.classList.add("hidden");
+    closeInvitePanel(true);
     overlay.classList.remove("hidden");
     renderAll();
   });
-  const close = () => overlay.classList.add("hidden");
+  const close = () => { closeInvitePanel(true); overlay.classList.add("hidden"); };
   closeBtn.addEventListener("click", close);
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !overlay.classList.contains("hidden")) close(); });
+  // clicar no fundo escuro fecha (inclui a folga entre o modal e o painel de histórico)
+  const layoutEl = document.getElementById("apLayout");
+  // Qualquer clique que não caia dentro de um painel (modal, histórico, janela de convite) fecha.
+  // A checagem por "closest" cobre também as folgas/padding do layout. Elementos que saíram do DOM
+  // durante o clique (re-render de lista) são ignorados para não fechar sem querer.
+  overlay.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!t || !t.isConnected) return;
+    if (t === overlay || t === layoutEl || !t.closest(".guide-modal, .ap-invite-panel, .ap-invite-backdrop")) close();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || overlay.classList.contains("hidden")) return;
+    if (invitePanelOpen()) closeInvitePanel(); else close();   // Esc fecha primeiro a janela de convite
+  });
 
   // troca de idioma: refaz os textos dinâmicos (os estáticos usam data-i18n)
-  window.refreshAutoParty = () => { if (!overlay.classList.contains("hidden")) { renderAll(); resultEl.textContent = ""; } };
+  window.refreshAutoParty = () => { if (!overlay.classList.contains("hidden")) { renderAll(); clearResult(); } };
 })();
